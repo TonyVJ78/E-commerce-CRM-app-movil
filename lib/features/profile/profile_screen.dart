@@ -269,7 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Botón de Cerrar Sesión (CU05)
+            // Botón de Cerrar Sesión (CU03)
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,

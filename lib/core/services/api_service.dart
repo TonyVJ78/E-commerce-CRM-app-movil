@@ -32,6 +32,11 @@ class ApiService {
     return prefs.getString('km_access_token');
   }
 
+  Future<String?> getRefreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('km_refresh_token');
+  }
+
   Future<void> saveTokens({required String access, required String refresh}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('km_access_token', access);
