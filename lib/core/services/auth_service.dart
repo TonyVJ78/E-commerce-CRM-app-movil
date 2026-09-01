@@ -33,7 +33,7 @@ class AuthService extends ChangeNotifier {
     await prefs.setString('km_user', jsonEncode(user.toMap()));
   }
 
-  void _clearUserFromStorage() async {
+  Future<void> _clearUserFromStorage() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('km_user');
   }
@@ -186,19 +186,31 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // --- LOGOUT ---
+  // --- LOGOUT (CU03: Cerrar sesión) ---
   Future<void> logout() async {
+    _isLoading = true;
+    notifyListeners();
+
+    // Intento de invalidar el refresh token en el backend (blacklist).
+    // Si falla o no hay conexión, igual se cierra la sesión localmente.
     if (ApiService.instance.useOnlineBackend) {
       try {
-        final refresh = await ApiService.instance.getAccessToken();
-        if (refresh != null) {
-          await ApiService.instance.post(ApiConstants.logout, {'refresh': refresh}, auth: true);
+        final refreshToken = await ApiService.instance.getRefreshToken();
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          await ApiService.instance.post(
+            ApiConstants.logout,
+            {'refresh': refreshToken},
+            auth: true,
+          );
         }
       } catch (_) {}
     }
+
     await ApiService.instance.clearTokens();
     _currentUser = null;
-    _clearUserFromStorage();
+    _errorMessage = null;
+    await _clearUserFromStorage();
+    _isLoading = false;
     notifyListeners();
   }
 
