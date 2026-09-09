@@ -1,8 +1,9 @@
 class ApiConstants {
-  // URLs por defecto. El backend del proyecto corre en el puerto 8001
-  // (el 8000 está ocupado por otro programa en la máquina de desarrollo).
-  static const String defaultEmulatorUrl = 'http://10.0.2.2:8001/api';
-  static const String defaultLocalhostUrl = 'http://127.0.0.1:8001/api';
+  // URLs por defecto: el puerto 8000 de `python manage.py runserver`.
+  // Es sólo el valor inicial; cada quien ajusta la suya en Perfil → Ajustes y
+  // queda guardada en el dispositivo.
+  static const String defaultEmulatorUrl = 'http://10.0.2.2:8000/api';
+  static const String defaultLocalhostUrl = 'http://127.0.0.1:8000/api';
 
   // --- Autenticación (CU-01 a CU-05) ---
   static const String login = '/auth/login/';
