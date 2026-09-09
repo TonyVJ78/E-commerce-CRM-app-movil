@@ -6,7 +6,7 @@ import '../shared/custom_button.dart';
 import '../shared/custom_text_field.dart';
 import 'register_screen.dart';
 import 'password_recovery_screen.dart';
-import '../profile/profile_screen.dart';
+import '../shared/home_shell.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _navigateToHome() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+      MaterialPageRoute(builder: (_) => const HomeShell()),
     );
   }
 
