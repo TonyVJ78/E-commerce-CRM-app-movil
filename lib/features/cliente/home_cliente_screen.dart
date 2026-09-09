@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants/colors.dart';
-import '../../core/services/auth_service.dart';
-import '../../core/services/catalogo_service.dart';
-import '../../core/services/cart_service.dart';
-import '../../core/models/producto.dart';
-import '../shared/kantu_app_bar.dart';
-import 'producto_detail_sheet.dart';
-import 'cart_screen.dart';
-import '../profile/profile_screen.dart';
 
+import '../../core/constants/colors.dart';
+import '../../core/models/producto.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/services/cart_service.dart';
+import '../../core/services/catalogo_service.dart';
+import '../shared/home_shell.dart';
+import '../shared/kantu_app_bar.dart';
+import '../shared/kantu_search_field.dart';
+import '../shared/producto_imagen.dart';
+import 'producto_detail_sheet.dart';
+
+/// Vitrina del cliente (CU-11). En modo servidor lee el catálogo público
+/// (`/api/catalogo/productos/`, con búsqueda y filtro del lado del servidor) y
+/// en modo autónomo el mismo catálogo desde SQLite.
 class HomeClienteScreen extends StatefulWidget {
   const HomeClienteScreen({super.key});
 
@@ -24,7 +29,10 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CatalogoService>().loadCatalogo();
+      final catalogo = context.read<CatalogoService>();
+      catalogo.limpiarFiltros();
+      catalogo.loadCatalogo();
+      context.read<CartService>().loadCarrito(context.read<AuthService>().currentUser);
     });
   }
 
@@ -32,6 +40,48 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _abrirDetalle(Producto producto) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ProductoDetailSheet(producto: producto),
+    );
+  }
+
+  /// Agregado rápido desde la tarjeta: sólo tiene sentido cuando no hay que
+  /// elegir entre varias variantes; si las hay, se abre el detalle.
+  Future<void> _agregarRapido(Producto producto) async {
+    if (producto.tieneVariasVariantes) {
+      await _abrirDetalle(producto);
+      return;
+    }
+
+    final variante = producto.variantePrincipal;
+    if (variante == null) return;
+
+    final cart = context.read<CartService>();
+    final ok = await cart.agregar(
+      producto: producto,
+      variante: variante,
+      cliente: context.read<AuthService>().currentUser,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(ok
+              ? '¡${producto.nombre} agregado!'
+              : (cart.errorMessage ?? 'No se pudo agregar al carrito.')),
+          duration: const Duration(seconds: 2),
+          backgroundColor: ok ? KantuColors.success : KantuColors.error,
+        ),
+      );
+    cart.limpiarError();
   }
 
   @override
@@ -46,363 +96,374 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
         title: 'Kantu Market',
         showBackButton: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline, color: KantuColors.textPrimary),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
-            },
-          ),
+          // Atajo al carrito con su total. La pestaña de abajo ya lleva el
+          // contador, así que aquí basta un botón discreto y no un FAB que
+          // tape la última fila de productos.
+          if (cart.itemCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                style: TextButton.styleFrom(
+                  foregroundColor: KantuColors.primary,
+                  backgroundColor: KantuColors.primaryLight,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+                label: Text(
+                  'Bs. ${cart.totalAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                ),
+                onPressed: () => HomeShellScope.of(context)?.irATab(1),
+              ),
+            ),
         ],
       ),
-      floatingActionButton: cart.itemCount > 0
-          ? FloatingActionButton.extended(
-              backgroundColor: KantuColors.primary,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.shopping_bag_outlined),
-              label: Text(
-                'Carrito (${cart.itemCount}) • Bs. ${cart.totalAmount.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CartScreen()),
-                );
-              },
-            )
-          : null,
       body: RefreshIndicator(
         onRefresh: () => catalogo.loadCatalogo(),
         color: KantuColors.primary,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 80),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Hero Banner Boliviano
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: KantuColors.heroGradient,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: KantuColors.primary.withAlpha(50),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(40),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('🇧🇴', style: TextStyle(fontSize: 14)),
-                          SizedBox(width: 6),
-                          Text(
-                            'Mercado Digital Boliviano',
-                            style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '¡Hola, ${auth.currentUser?.firstName ?? "Cliente"}! 👋',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Descubre productos auténticos de emprendedores bolivianos.',
-                      style: TextStyle(fontSize: 13, color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Search Bar
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (val) => catalogo.setSearch(val),
-                  decoration: InputDecoration(
-                    hintText: 'Buscar textiles, artesanías, café...',
-                    hintStyle: const TextStyle(fontSize: 13, color: KantuColors.textMuted),
-                    prefixIcon: const Icon(Icons.search, color: KantuColors.textMuted),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () {
-                              _searchController.clear();
-                              catalogo.setSearch('');
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: KantuColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: KantuColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: const BorderSide(color: KantuColors.primary, width: 1.5),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Category Chips
-              if (catalogo.categorias.isNotEmpty) ...[
-                SizedBox(
-                  height: 40,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HeroBanner(nombre: auth.currentUser?.firstName ?? 'Cliente'),
+                  Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: catalogo.categorias.length + 1,
-                    itemBuilder: (ctx, idx) {
-                      if (idx == 0) {
-                        final isSelected = catalogo.selectedCategoriaId == null;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: const Text('Todos'),
-                            selected: isSelected,
-                            selectedColor: KantuColors.primary,
-                            labelStyle: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: isSelected ? Colors.white : KantuColors.textPrimary,
-                            ),
-                            onSelected: (_) => catalogo.setCategoria(null),
-                          ),
-                        );
-                      }
-                      final cat = catalogo.categorias[idx - 1];
-                      final isSelected = catalogo.selectedCategoriaId == cat.id;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(cat.nombre),
-                          selected: isSelected,
-                          selectedColor: KantuColors.primary,
-                          labelStyle: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: isSelected ? Colors.white : KantuColors.textPrimary,
-                          ),
-                          onSelected: (_) => catalogo.setCategoria(cat.id),
-                        ),
-                      );
-                    },
+                    child: KantuSearchField(
+                      controller: _searchController,
+                      hint: 'Buscar textiles, artesanías, café...',
+                      // Sólo al enviar: en modo servidor buscar por tecla sería
+                      // una petición por carácter.
+                      onSubmitted: catalogo.setSearch,
+                      onChanged: (valor) {
+                        setState(() {});
+                        if (valor.isEmpty) catalogo.setSearch('');
+                      },
+                      onLimpiar: () {
+                        _searchController.clear();
+                        catalogo.setSearch('');
+                        setState(() {});
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-              ],
+                  const SizedBox(height: 16),
 
-              // Products Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Catálogo de Productos',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: KantuColors.textPrimary,
+                  if (catalogo.categorias.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: FiltrosCategoria(
+                        categorias: [
+                          (id: null, nombre: 'Todos'),
+                          for (final c in catalogo.categorias) (id: c.id, nombre: c.nombre),
+                        ],
+                        seleccionada: catalogo.selectedCategoriaId,
+                        onSeleccionar: catalogo.setCategoria,
                       ),
                     ),
-                    Text(
-                      '${catalogo.productos.length} items',
-                      style: const TextStyle(fontSize: 12, color: KantuColors.textSecondary),
-                    ),
+                    const SizedBox(height: 16),
                   ],
-                ),
-              ),
-              const SizedBox(height: 12),
 
-              // Product Grid
-              if (catalogo.isLoading)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: CircularProgressIndicator(color: KantuColors.primary),
-                  ),
-                )
-              else if (catalogo.productos.isEmpty)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('🔍', style: TextStyle(fontSize: 48)),
-                        const SizedBox(height: 12),
                         const Text(
-                          'No se encontraron productos',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          'Catálogo de Productos',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: KantuColors.textPrimary,
+                          ),
                         ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Intenta con otra búsqueda o categoría',
-                          style: TextStyle(fontSize: 12, color: KantuColors.textSecondary),
+                        Text(
+                          '${catalogo.productos.length} items',
+                          style: const TextStyle(fontSize: 12, color: KantuColors.textSecondary),
                         ),
                       ],
                     ),
                   ),
-                )
-              else
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+
+            if (catalogo.isLoading)
+              const SliverToBoxAdapter(
+                child: Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(color: KantuColors.primary),
+                  ),
+                ),
+              )
+            else if (catalogo.productos.isEmpty)
+              const SliverToBoxAdapter(child: _SinResultados())
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     mainAxisSpacing: 12,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 0.72,
+                    childAspectRatio: 0.66,
                   ),
-                  itemCount: catalogo.productos.length,
-                  itemBuilder: (ctx, idx) {
-                    final p = catalogo.productos[idx];
-                    return _buildProductCard(context, p);
-                  },
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, idx) {
+                      final producto = catalogo.productos[idx];
+                      return _TarjetaProducto(
+                        producto: producto,
+                        onTap: () => _abrirDetalle(producto),
+                        onAgregar: () => _agregarRapido(producto),
+                      );
+                    },
+                    childCount: catalogo.productos.length,
+                  ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildProductCard(BuildContext context, Producto p) {
-    final cart = context.read<CartService>();
+class _HeroBanner extends StatelessWidget {
+  final String nombre;
+
+  const _HeroBanner({required this.nombre});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: KantuColors.heroGradient,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: KantuColors.primary.withAlpha(50),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(40),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('🇧🇴', style: TextStyle(fontSize: 14)),
+                SizedBox(width: 6),
+                Text(
+                  'Mercado Digital Boliviano',
+                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '¡Hola, $nombre! 👋',
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Descubre productos auténticos de emprendedores bolivianos.',
+            style: TextStyle(fontSize: 13, color: Colors.white70),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TarjetaProducto extends StatelessWidget {
+  final Producto producto;
+  final VoidCallback onTap;
+  final VoidCallback onAgregar;
+
+  const _TarjetaProducto({
+    required this.producto,
+    required this.onTap,
+    required this.onAgregar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final agotado = producto.agotado;
 
     return GestureDetector(
-      onTap: () {
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (_) => ProductoDetailSheet(producto: p),
-        );
-      },
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: KantuColors.border),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(5),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+            BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image Placeholder with Icon
-            Container(
-              height: 110,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: KantuColors.primaryLight,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-              ),
-              child: Center(
-                child: Text(
-                  p.categoriaNombre.contains('Café') ? '☕' : p.categoriaNombre.contains('Joyería') ? '💎' : p.categoriaNombre.contains('Cerámica') ? '🏺' : '🧣',
-                  style: const TextStyle(fontSize: 42),
+            Stack(
+              children: [
+                ProductoImagen(
+                  origen: producto.imagenPrincipal,
+                  height: 120,
+                  width: double.infinity,
+                  radio: 15,
+                ),
+                if (agotado)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: KantuColors.error,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'AGOTADO',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
+                      ),
+                    ),
+                  )
+                else if (producto.variantePrincipal?.enOferta == true)
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: KantuColors.accent,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'OFERTA',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: KantuColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      producto.tiendaNombre.isNotEmpty ? producto.tiendaNombre : 'Kantu Market',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: KantuColors.textMuted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Expanded(
+                      child: Text(
+                        producto.nombre,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: KantuColors.textPrimary,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (producto.tieneVariasVariantes)
+                      Text(
+                        '${producto.variantesActivas.length} presentaciones',
+                        style: const TextStyle(fontSize: 10, color: KantuColors.textMuted),
+                      ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: FittedBox(
+                            child: Text(
+                              '${producto.tieneVariasVariantes ? "Desde " : ""}Bs. ${producto.precioBase.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: KantuColors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: agotado ? null : onAgregar,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: agotado ? KantuColors.border : KantuColors.primaryLight,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.add_shopping_cart,
+                              size: 16,
+                              color: agotado ? KantuColors.textMuted : KantuColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-            // Info
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    p.tiendaNombre.isNotEmpty ? p.tiendaNombre : 'Kantu Market',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: KantuColors.textMuted),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    p.nombre,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: KantuColors.textPrimary,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Bs. ${p.precioBase.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: KantuColors.primary,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          cart.addItem(p);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('¡${p.nombre} agregado!'),
-                              duration: const Duration(seconds: 1),
-                              backgroundColor: KantuColors.success,
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: KantuColors.primaryLight,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.add_shopping_cart, size: 16, color: KantuColors.primary),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+class _SinResultados extends StatelessWidget {
+  const _SinResultados();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(32),
+        child: Column(
+          children: [
+            Text('🔍', style: TextStyle(fontSize: 48)),
+            SizedBox(height: 12),
+            Text(
+              'No se encontraron productos',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Intenta con otra búsqueda o categoría',
+              style: TextStyle(fontSize: 12, color: KantuColors.textSecondary),
             ),
           ],
         ),

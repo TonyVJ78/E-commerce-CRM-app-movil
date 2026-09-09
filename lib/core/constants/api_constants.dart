@@ -1,9 +1,10 @@
 class ApiConstants {
-  // URLs por defecto
-  static const String defaultEmulatorUrl = 'http://10.0.2.2:8000/api';
-  static const String defaultLocalhostUrl = 'http://127.0.0.1:8000/api';
+  // URLs por defecto. El backend del proyecto corre en el puerto 8001
+  // (el 8000 está ocupado por otro programa en la máquina de desarrollo).
+  static const String defaultEmulatorUrl = 'http://10.0.2.2:8001/api';
+  static const String defaultLocalhostUrl = 'http://127.0.0.1:8001/api';
 
-  // Endpoints
+  // --- Autenticación (CU-01 a CU-05) ---
   static const String login = '/auth/login/';
   static const String registro = '/auth/registro/';
   static const String logout = '/auth/logout/';
@@ -11,5 +12,23 @@ class ApiConstants {
   static const String perfil = '/auth/perfil/';
   static const String passwordReset = '/auth/password-reset/';
   static const String passwordResetConfirm = '/auth/password-reset-confirm/';
+
+  // --- Tiendas (CU-06) y panel del vendedor (CU-10) ---
   static const String tiendas = '/tiendas/';
+  static const String dashboardVendedor = '/tiendas/dashboard/';
+
+  // --- Catálogo de la empresa (CU-08 y CU-09) ---
+  static String categoriasTienda(int tiendaId) => '/tiendas/$tiendaId/categorias/';
+  static String productosTienda(int tiendaId) => '/tiendas/$tiendaId/productos/';
+  static String productoDetalle(int tiendaId, int productoId) =>
+      '/tiendas/$tiendaId/productos/$productoId/';
+
+  // --- Catálogo público del cliente (CU-11) ---
+  static const String catalogoProductos = '/catalogo/productos/';
+  static const String catalogoCategorias = '/catalogo/categorias/';
+
+  // --- Carrito (CU-11) ---
+  static const String carrito = '/pedidos/carrito/';
+  static const String carritoItems = '/pedidos/carrito/items/';
+  static String carritoItemDetalle(int itemId) => '/pedidos/carrito/items/$itemId/';
 }
