@@ -37,22 +37,25 @@ Aplicacion movil desarrollada en Flutter para la plataforma de comercio digital 
 
 ## Generar el APK para repartir
 
-La app puede trabajar contra el servidor del proyecto (los mismos datos que la
-web) o contra una copia local de SQLite que lleva dentro. **El APK que se
-reparte debe venir con la direccion del servidor ya puesta**, o quien lo instale
-abrira la app en modo local y las cuentas del equipo no le entraran.
+La app habla siempre con el despliegue del proyecto
+(`https://kantumarket.vercel.app/api`), que es la misma base de datos que ve la
+web. Esa direccion es el valor por defecto en `ApiConstants.apiProduccion`, asi
+que basta con:
 
 ```bash
-flutter build apk --release --dart-define=API_BASE_URL=https://kantumarket.vercel.app/api
+flutter build apk --release
 ```
 
-Esa es la direccion del despliegue del proyecto, la misma base de datos que ve
-la web. Un APK compilado asi funciona en cualquier telefono con internet, sin
-depender de que ninguna PC este encendida.
-
 El APK queda en `build/app/outputs/flutter-apk/app-release.apk` (~53 MB) y
-arranca ya conectado a esa direccion. Sin `--dart-define` el APK arranca en modo
-local y hay que configurarlo a mano en Perfil > Ajustes.
+funciona en cualquier telefono con internet, sin depender de que ninguna PC este
+encendida ni de configurar nada dentro de la app.
+
+Para apuntar a otro servidor (una PC de la red, un despliegue de pruebas) se
+compila con la direccion dentro:
+
+```bash
+flutter build apk --release --dart-define=API_BASE_URL=http://IP-DE-LA-PC:8000/api
+```
 
 Que poner en `API_BASE_URL` (siempre terminado en `/api`):
 
@@ -73,8 +76,9 @@ dejar pasar el puerto en el firewall de Windows:
 python manage.py runserver 0.0.0.0:8000
 ```
 
-Dentro de la app, **Perfil > Ajustes > Probar conexion** dice si la direccion
-responde y, si no, por que.
+La app no tiene pantalla para cambiar el servidor: la direccion se fija al
+compilar y nada mas. Se quito a proposito, porque un ajuste mal tocado dejaba la
+app leyendo la base local sin que se notara.
 
 ### Cuentas del servidor
 

@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
-import '../../core/services/api_service.dart';
 import '../../core/services/auth_service.dart';
 import '../shared/custom_button.dart';
 import '../shared/custom_text_field.dart';
 import '../shared/kantu_app_bar.dart';
 import '../auth/login_screen.dart';
-import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -266,45 +264,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                 ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Conectividad con el backend (modo autónomo / servidor remoto)
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: KantuColors.border),
-              ),
-              child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: KantuColors.info.withAlpha(20),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.settings_ethernet, color: KantuColors.info, size: 20),
-                ),
-                title: const Text(
-                  'Configuración del Servidor',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                ),
-                subtitle: Text(
-                  ApiService.instance.useOnlineBackend
-                      ? 'Modo servidor remoto · ${ApiService.instance.baseUrl}'
-                      : 'Modo autónomo local (SQLite)',
-                  style: const TextStyle(fontSize: 12, color: KantuColors.textSecondary),
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: KantuColors.textMuted),
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  );
-                  // El subtítulo depende del modo, que la pantalla pudo cambiar.
-                  if (mounted) setState(() {});
-                },
               ),
             ),
             const SizedBox(height: 16),

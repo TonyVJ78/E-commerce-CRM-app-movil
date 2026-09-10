@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,14 +53,6 @@ class ApiService {
     _useOnlineBackend = prefs.getBool('use_online_backend') ?? ApiConstants.onlinePorDefecto;
   }
 
-  Future<void> setConfig({required String baseUrl, required bool useOnline}) async {
-    _baseUrl = baseUrl;
-    _useOnlineBackend = useOnline;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('api_base_url', baseUrl);
-    await prefs.setBool('use_online_backend', useOnline);
-  }
-
   Future<String?> getAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('km_access_token');
@@ -82,42 +73,6 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('km_access_token');
     await prefs.remove('km_refresh_token');
-  }
-
-  /// Comprueba que `baseUrl` responde como un backend de Kantu Market.
-  ///
-  /// Devuelve `null` cuando la conexión es buena, o una frase explicando qué
-  /// falló. Existe porque el fallo típico en un teléfono real —la URL apunta a
-  /// una máquina inalcanzable— es indistinguible del modo autónomo: la app
-  /// abre igual, pero con la base local y sin las cuentas del equipo.
-  Future<String?> probarConexion(String baseUrl) async {
-    final limpio = baseUrl.trim();
-    if (limpio.isEmpty) return 'Escribe la URL del servidor.';
-
-    final uri = Uri.tryParse('$limpio${ApiConstants.catalogoTiendas}');
-    if (uri == null || !uri.isAbsolute || !uri.scheme.startsWith('http')) {
-      return 'La URL no es válida. Debe empezar con http:// o https:// y '
-          'terminar en /api (por ejemplo http://192.168.1.10:8000/api).';
-    }
-
-    try {
-      final res = await http.get(uri).timeout(const Duration(seconds: 8));
-      if (res.statusCode == 200) return null;
-      if (res.statusCode == 404) {
-        return 'El servidor respondió, pero no encontró $limpio${ApiConstants.catalogoTiendas}. '
-            'Revisa que la URL termine en /api.';
-      }
-      return 'El servidor respondió con el código ${res.statusCode}.';
-    } on TimeoutException {
-      return 'El servidor no respondió en 8 segundos. Si es una PC de la red, '
-          'levanta Django con 0.0.0.0 y revisa el firewall de Windows.';
-    } on SocketException catch (e) {
-      return 'No se pudo conectar (${e.osError?.message ?? 'red inalcanzable'}). '
-          'Recuerda que 10.0.2.2 y localhost sólo funcionan dentro del emulador: '
-          'en un teléfono hay que usar la IP de la PC o la URL pública.';
-    } catch (e) {
-      return 'No se pudo conectar: $e';
-    }
   }
 
   Uri _uri(String endpoint, [Map<String, String>? query]) {
