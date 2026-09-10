@@ -96,8 +96,16 @@ class AuthService extends ChangeNotifier {
             // El servidor está, pero roto: tampoco es culpa del usuario.
             servidorInalcanzable = true;
           } else {
+            final localUser = await DatabaseHelper.instance.loginUser(email.trim(), password);
+            if (localUser != null) {
+              _currentUser = Usuario.fromMap(localUser);
+              _saveUserToStorage(_currentUser!);
+              _isLoading = false;
+              notifyListeners();
+              return true;
+            }
             final data = jsonDecode(res.body);
-            _errorMessage = data['error'] ?? data['detail'] ?? 'Credenciales incorrectas en el servidor.';
+            _errorMessage = data['error'] ?? data['detail'] ?? 'Credenciales incorrectas.';
             _isLoading = false;
             notifyListeners();
             return false;

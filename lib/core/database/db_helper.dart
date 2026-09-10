@@ -293,10 +293,30 @@ class DatabaseHelper {
     });
 
     await db.insert('usuario', {
+      'email': 'empresa1@kantu.bo',
+      'password': 'Password123!',
+      'first_name': 'Maria',
+      'last_name': 'Condori',
+      'rol': 'empresa',
+      'activo': 1,
+      'fecha_registro': now,
+    });
+
+    await db.insert('usuario', {
       'email': 'cliente@kantu.bo',
       'password': 'Password123!',
       'first_name': 'Ana',
       'last_name': 'Pérez',
+      'rol': 'cliente',
+      'activo': 1,
+      'fecha_registro': now,
+    });
+
+    await db.insert('usuario', {
+      'email': 'cliente1@kantu.bo',
+      'password': 'Password123!',
+      'first_name': 'Lucia',
+      'last_name': 'Rojas',
       'rol': 'cliente',
       'activo': 1,
       'fecha_registro': now,

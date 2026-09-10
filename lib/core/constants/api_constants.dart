@@ -4,15 +4,15 @@ class ApiConstants {
   ///
   ///   flutter build apk --release --dart-define=API_BASE_URL=https://tu-servidor/api
   ///
-  /// Se deja vacía en el repo a propósito: la URL de despliegue (o la IP de una
-  /// PC en la red) es de cada quien y no debe viajar en el código compartido.
-  static const String buildBaseUrl = String.fromEnvironment('API_BASE_URL');
+  /// Por defecto apunta a la API en producción en Vercel.
+  static const String buildBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://kantumarket.vercel.app/api',
+  );
 
-  // Valores por defecto: el puerto 8000 de `python manage.py runserver`.
-  // Sólo son el punto de partida; cada quien ajusta la suya en Perfil → Ajustes
-  // y queda guardada en el dispositivo.
-  static const String defaultEmulatorUrl = 'http://10.0.2.2:8000/api';
-  static const String defaultLocalhostUrl = 'http://127.0.0.1:8000/api';
+  // Valores por defecto de partida
+  static const String defaultEmulatorUrl = 'https://kantumarket.vercel.app/api';
+  static const String defaultLocalhostUrl = 'https://kantumarket.vercel.app/api';
 
   /// URL con la que arranca una instalación nueva.
   static String get urlInicial =>
