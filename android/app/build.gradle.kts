@@ -37,11 +37,11 @@ android {
         }
     }
 
-    packaging {
-        jniLibs {
-            keepDebugSymbols.add("**/*")
-        }
-    }
+    // Sin este bloque el APK de release pasaba de ~175 MB porque conservaba los
+    // símbolos de depuración de las librerías nativas. Un archivo así es lento
+    // de compartir y algunos teléfonos ni lo instalan. Si al compilar aparece un
+    // error de `strip` del NDK, la solución es instalar el NDK que pide Gradle,
+    // no volver a guardar los símbolos.
 }
 
 kotlin {

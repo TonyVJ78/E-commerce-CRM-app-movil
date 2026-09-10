@@ -1,9 +1,27 @@
 class ApiConstants {
-  // URLs por defecto: el puerto 8000 de `python manage.py runserver`.
-  // Es sólo el valor inicial; cada quien ajusta la suya en Perfil → Ajustes y
-  // queda guardada en el dispositivo.
+  /// URL del backend fijada **al compilar**, para repartir un APK que ya sabe
+  /// a qué servidor hablar sin que nadie toque Ajustes:
+  ///
+  ///   flutter build apk --release --dart-define=API_BASE_URL=https://tu-servidor/api
+  ///
+  /// Se deja vacía en el repo a propósito: la URL de despliegue (o la IP de una
+  /// PC en la red) es de cada quien y no debe viajar en el código compartido.
+  static const String buildBaseUrl = String.fromEnvironment('API_BASE_URL');
+
+  // Valores por defecto: el puerto 8000 de `python manage.py runserver`.
+  // Sólo son el punto de partida; cada quien ajusta la suya en Perfil → Ajustes
+  // y queda guardada en el dispositivo.
   static const String defaultEmulatorUrl = 'http://10.0.2.2:8000/api';
   static const String defaultLocalhostUrl = 'http://127.0.0.1:8000/api';
+
+  /// URL con la que arranca una instalación nueva.
+  static String get urlInicial =>
+      buildBaseUrl.isNotEmpty ? buildBaseUrl : defaultEmulatorUrl;
+
+  /// Un APK compilado con `API_BASE_URL` arranca ya en modo servidor: es la
+  /// diferencia entre "abre y muestra los datos reales" y "abre con la base
+  /// local y las cuentas del equipo no entran".
+  static bool get onlinePorDefecto => buildBaseUrl.isNotEmpty;
 
   // --- Autenticación (CU-01 a CU-05) ---
   static const String login = '/auth/login/';
@@ -27,6 +45,10 @@ class ApiConstants {
   // --- Catálogo público del cliente (CU-11) ---
   static const String catalogoProductos = '/catalogo/productos/';
   static const String catalogoCategorias = '/catalogo/categorias/';
+
+  /// Tiendas activas para el filtro de la vitrina. Es `AllowAny`, así que
+  /// también sirve de sonda para comprobar si el servidor está vivo.
+  static const String catalogoTiendas = '/catalogo/tiendas/';
 
   // --- Carrito (CU-11) ---
   static const String carrito = '/pedidos/carrito/';

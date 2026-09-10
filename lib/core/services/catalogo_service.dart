@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../constants/api_constants.dart';
 import '../database/db_helper.dart';
 import '../models/producto.dart';
+import '../models/tienda.dart';
 import 'api_service.dart';
 
 /// Resultado de una operación de catálogo.
@@ -35,6 +36,8 @@ class ResultadoCatalogo {
 class CatalogoService extends ChangeNotifier {
   List<Producto> _productos = [];
   List<Categoria> _categorias = [];
+  List<Tienda> _tiendas = [];
+  int? _selectedTiendaId;
   int? _selectedCategoriaId;
   String _searchQuery = '';
   bool _isLoading = false;
@@ -43,7 +46,33 @@ class CatalogoService extends ChangeNotifier {
 
   List<Producto> get productos => _productos;
   List<Categoria> get categorias => _categorias;
+  List<Tienda> get tiendas => _tiendas;
+  int? get selectedTiendaId => _selectedTiendaId;
   int? get selectedCategoriaId => _selectedCategoriaId;
+
+  /// Nombre de la tienda filtrada, para que la vitrina pueda decir qué se está
+  /// viendo sin volver a buscar en la lista.
+  String? get selectedTiendaNombre {
+    if (_selectedTiendaId == null) return null;
+    for (final t in _tiendas) {
+      if (t.id == _selectedTiendaId) return t.nombre;
+    }
+    return null;
+  }
+
+  /// Nombre de la categoría seleccionada. En el catálogo general el filtro
+  /// viaja por nombre y no por id: cada tienda tiene su propia fila para
+  /// "Accesorios", así que el id sólo alcanzaría a los productos de una.
+  String? get selectedCategoriaNombre {
+    if (_selectedCategoriaId == null) return null;
+    for (final c in _categorias) {
+      if (c.id == _selectedCategoriaId) return c.nombre;
+    }
+    return null;
+  }
+
+  bool get hayFiltrosActivos =>
+      _selectedTiendaId != null || _selectedCategoriaId != null || _searchQuery.trim().isNotEmpty;
   String get searchQuery => _searchQuery;
   bool get isLoading => _isLoading;
   bool get incluirInactivos => _incluirInactivos;
@@ -64,30 +93,70 @@ class CatalogoService extends ChangeNotifier {
   /// y aún activo tras CU-09.
   Future<void> loadCatalogo({int? tiendaId}) async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
+    // El parámetro manda cuando la pantalla abre una tienda concreta; si no,
+    // vale el filtro que el cliente eligió en la vitrina.
+    final tiendaEfectiva = tiendaId ?? _selectedTiendaId;
+
     try {
+      await _loadTiendas();
+
       if (_online) {
-        final ok = await _loadCatalogoRemoto(tiendaId: tiendaId);
+        final ok = await _loadCatalogoRemoto(tiendaId: tiendaEfectiva);
         if (ok) {
           _isLoading = false;
           notifyListeners();
           return;
         }
+        _errorMessage = 'No se pudo contactar al servidor. Mostrando el catálogo '
+            'guardado en este dispositivo.';
       }
 
-      _categorias = await DatabaseHelper.instance.getCategorias(tiendaId: tiendaId);
+      _categorias = await DatabaseHelper.instance.getCategorias(tiendaId: tiendaEfectiva);
       _productos = await DatabaseHelper.instance.getProductos(
-        tiendaId: tiendaId,
-        categoriaId: _selectedCategoriaId,
+        tiendaId: tiendaEfectiva,
+        // Igual que en remoto: con tienda fija vale el id; sin ella se filtra
+        // después por nombre, ya abajo.
+        categoriaId: tiendaEfectiva != null ? _selectedCategoriaId : null,
         search: _searchQuery,
       );
+
+      final nombreCategoria = selectedCategoriaNombre;
+      if (tiendaEfectiva == null && nombreCategoria != null) {
+        _productos = _productos
+            .where((p) => p.categoriaNombre.toLowerCase() == nombreCategoria.toLowerCase())
+            .toList();
+      }
     } catch (e) {
       _errorMessage = 'No se pudo cargar el catálogo: $e';
     }
 
     _isLoading = false;
     notifyListeners();
+  }
+
+  /// Tiendas activas para el filtro de la vitrina. Si el servidor no contesta
+  /// se queda con las locales, para que el filtro nunca aparezca vacío.
+  Future<void> _loadTiendas() async {
+    if (_online) {
+      try {
+        final res = await ApiService.instance.get(ApiConstants.catalogoTiendas);
+        if (res.statusCode == 200) {
+          _tiendas = _comoLista(res.body).map((t) => Tienda.fromJson(t)).toList();
+          return;
+        }
+      } catch (_) {
+        // Cae a las locales.
+      }
+    }
+
+    try {
+      _tiendas = await DatabaseHelper.instance.getTiendas();
+    } catch (_) {
+      _tiendas = [];
+    }
   }
 
   Future<bool> _loadCatalogoRemoto({int? tiendaId}) async {
@@ -99,20 +168,41 @@ class CatalogoService extends ChangeNotifier {
       );
       if (categoriasRes.statusCode == 200) {
         _categorias = _comoLista(categoriasRes.body).map((c) => Categoria.fromJson(c)).toList();
+        // Sin tienda, el listado trae una fila por cada tienda que use ese
+        // nombre. Se deduplica aquí y no sólo en el servidor porque el backend
+        // desplegado puede ser anterior a ese arreglo.
+        if (tiendaId == null) _categorias = _sinNombresRepetidos(_categorias);
       }
 
+      // Con una tienda fija el id de categoría es exacto; sin ella se filtra
+      // por nombre para juntar la misma categoría de todas las tiendas.
+      final categoriaNombre = selectedCategoriaNombre;
       final productosRes = await ApiService.instance.get(
         ApiConstants.catalogoProductos,
         auth: true,
         query: {
           if (tiendaId != null) 'tienda': '$tiendaId',
-          if (_selectedCategoriaId != null) 'categoria': '$_selectedCategoriaId',
+          if (_selectedCategoriaId != null && tiendaId != null)
+            'categoria': '$_selectedCategoriaId',
+          if (_selectedCategoriaId != null && tiendaId == null && categoriaNombre != null)
+            'categoria_nombre': categoriaNombre,
           if (_searchQuery.trim().isNotEmpty) 'q': _searchQuery.trim(),
         },
       );
       if (productosRes.statusCode != 200) return false;
 
       _productos = _comoLista(productosRes.body).map((p) => Producto.fromJson(p)).toList();
+
+      // Red de seguridad: un backend que no conozca `categoria_nombre` ignora
+      // el parámetro y devuelve el catálogo entero. Repetir el filtro aquí no
+      // cuesta nada cuando el servidor sí lo aplicó, y evita que la categoría
+      // elegida parezca no hacer nada cuando no.
+      final nombre = categoriaNombre;
+      if (tiendaId == null && nombre != null) {
+        _productos = _productos
+            .where((p) => p.categoriaNombre.toLowerCase() == nombre.toLowerCase())
+            .toList();
+      }
       return true;
     } catch (_) {
       return false;
@@ -190,6 +280,19 @@ class CatalogoService extends ChangeNotifier {
     _productos = lista;
   }
 
+  /// Filtro por tienda de la vitrina del cliente. Volver a tocar la tienda ya
+  /// seleccionada la quita, igual que el de categorías.
+  ///
+  /// Al cambiar de tienda se suelta la categoría: las categorías pertenecen a
+  /// una tienda, así que conservarla dejaría la vitrina vacía sin explicación.
+  void setTienda(int? tiendaId) {
+    final nueva = _selectedTiendaId == tiendaId ? null : tiendaId;
+    if (nueva == _selectedTiendaId) return;
+    _selectedTiendaId = nueva;
+    _selectedCategoriaId = null;
+    loadCatalogo();
+  }
+
   void setCategoria(int? categoriaId, {int? tiendaId, bool empresa = false}) {
     _selectedCategoriaId = _selectedCategoriaId == categoriaId ? null : categoriaId;
     if (empresa && tiendaId != null) {
@@ -214,9 +317,20 @@ class CatalogoService extends ChangeNotifier {
   }
 
   void limpiarFiltros() {
+    _selectedTiendaId = null;
     _selectedCategoriaId = null;
     _searchQuery = '';
     _incluirInactivos = false;
+    _errorMessage = null;
+  }
+
+  /// Quita los filtros de la vitrina y recarga, sin tocar el de inactivos que
+  /// es del panel de la empresa.
+  void limpiarFiltrosVitrina() {
+    _selectedTiendaId = null;
+    _selectedCategoriaId = null;
+    _searchQuery = '';
+    loadCatalogo();
   }
 
   // =========================================================================
@@ -503,6 +617,12 @@ class CatalogoService extends ChangeNotifier {
   // =========================================================================
   // Utilidades
   // =========================================================================
+
+  /// Deja una sola categoría por nombre, conservando el orden de llegada.
+  static List<Categoria> _sinNombresRepetidos(List<Categoria> categorias) {
+    final vistos = <String>{};
+    return categorias.where((c) => vistos.add(c.nombre.toLowerCase())).toList();
+  }
 
   /// Acepta la lista plana que devuelve DRF sin paginación y, por si acaso, la
   /// forma paginada `{"results": [...]}`.

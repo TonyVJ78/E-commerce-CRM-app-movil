@@ -54,10 +54,23 @@ class AuthService extends ChangeNotifier {
   }
 
   // --- LOGIN ---
+  /// `true` cuando la sesión abierta salió de la base local **porque** el
+  /// servidor no respondía, estando la app en modo servidor. La UI lo usa para
+  /// advertir que lo que se ve no son los datos reales del proyecto.
+  bool _sesionLocal = false;
+  bool get sesionLocal => _sesionLocal;
+
   Future<bool> login(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
+
+    // Se recuerda si el servidor no contestó para no culpar después a las
+    // credenciales: entrar con una cuenta del equipo y recibir "correo o
+    // contraseña incorrectos" cuando el problema era la red mandó a más de uno
+    // a buscar el error donde no estaba.
+    var servidorInalcanzable = false;
+    _sesionLocal = false;
 
     try {
       if (ApiService.instance.useOnlineBackend) {
@@ -79,6 +92,9 @@ class AuthService extends ChangeNotifier {
             _isLoading = false;
             notifyListeners();
             return true;
+          } else if (res.statusCode >= 500) {
+            // El servidor está, pero roto: tampoco es culpa del usuario.
+            servidorInalcanzable = true;
           } else {
             final data = jsonDecode(res.body);
             _errorMessage = data['error'] ?? data['detail'] ?? 'Credenciales incorrectas en el servidor.';
@@ -87,7 +103,7 @@ class AuthService extends ChangeNotifier {
             return false;
           }
         } catch (_) {
-          // Fallback a Local Database
+          servidorInalcanzable = true;
         }
       }
 
@@ -96,11 +112,16 @@ class AuthService extends ChangeNotifier {
       if (userMap != null) {
         _currentUser = Usuario.fromMap(userMap);
         _saveUserToStorage(_currentUser!);
+        _sesionLocal = servidorInalcanzable;
         _isLoading = false;
         notifyListeners();
         return true;
       } else {
-        _errorMessage = 'Correo o contraseña incorrectos. Verifica tus credenciales.';
+        _errorMessage = servidorInalcanzable
+            ? 'No se pudo contactar al servidor (${ApiService.instance.baseUrl}), '
+                'así que se buscó la cuenta en este dispositivo y no está. '
+                'Ve a Perfil → Ajustes y usa "Probar conexión" para revisar la dirección.'
+            : 'Correo o contraseña incorrectos. Verifica tus credenciales.';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -272,13 +293,23 @@ class AuthService extends ChangeNotifier {
   }
 
   // Acceso Rápido Demo para pruebas con 1 toque
+  /// Accesos rápidos de la pantalla de login.
+  ///
+  /// La base local trae `cliente@` y `empresa@`, pero en el servidor del
+  /// proyecto esas cuentas se llaman `cliente1@` y `empresa1@`. Se prueban las
+  /// dos formas para que el botón sirva en los dos modos: usar sólo la primera
+  /// era el motivo de que en el teléfono "no entrara con las cuentas del
+  /// equipo".
   Future<void> loginQuickDemo(String role) async {
-    if (role == 'admin') {
-      await login('admin@kantu.bo', 'Password123!');
-    } else if (role == 'empresa') {
-      await login('empresa@kantu.bo', 'Password123!');
-    } else {
-      await login('cliente@kantu.bo', 'Password123!');
+    const clave = 'Password123!';
+    final candidatos = switch (role) {
+      'admin' => ['admin@kantu.bo', 'admin1@kantu.bo'],
+      'empresa' => ['empresa@kantu.bo', 'empresa1@kantu.bo'],
+      _ => ['cliente@kantu.bo', 'cliente1@kantu.bo'],
+    };
+
+    for (final email in candidatos) {
+      if (await login(email, clave)) return;
     }
   }
 }

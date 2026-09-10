@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/api_constants.dart';
@@ -15,16 +18,32 @@ class ApiService {
   /// remoto no responde, se cae rápido al modo local en vez de congelar la UI.
   static const Duration _timeout = Duration(seconds: 4);
 
-  String _baseUrl = ApiConstants.defaultEmulatorUrl;
-  bool _useOnlineBackend = false;
+  String _baseUrl = ApiConstants.urlInicial;
+  bool _useOnlineBackend = ApiConstants.onlinePorDefecto;
 
   String get baseUrl => _baseUrl;
   bool get useOnlineBackend => _useOnlineBackend;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    _baseUrl = prefs.getString('api_base_url') ?? ApiConstants.defaultEmulatorUrl;
-    _useOnlineBackend = prefs.getBool('use_online_backend') ?? false;
+    final urlDelBuild = ApiConstants.buildBaseUrl;
+
+    // Un APK compilado contra un servidor distinto al de la instalación
+    // anterior impone el suyo. Sin esto, actualizar la app en un teléfono que
+    // ya la tenía dejaba la dirección vieja guardada y el APK nuevo parecía no
+    // haber cambiado nada. Lo que el usuario elija a mano después se respeta,
+    // porque sólo se pisa cuando cambia la URL con la que se compiló.
+    if (urlDelBuild.isNotEmpty && prefs.getString('build_base_url') != urlDelBuild) {
+      _baseUrl = urlDelBuild;
+      _useOnlineBackend = true;
+      await prefs.setString('build_base_url', urlDelBuild);
+      await prefs.setString('api_base_url', urlDelBuild);
+      await prefs.setBool('use_online_backend', true);
+      return;
+    }
+
+    _baseUrl = prefs.getString('api_base_url') ?? ApiConstants.urlInicial;
+    _useOnlineBackend = prefs.getBool('use_online_backend') ?? ApiConstants.onlinePorDefecto;
   }
 
   Future<void> setConfig({required String baseUrl, required bool useOnline}) async {
@@ -55,6 +74,42 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('km_access_token');
     await prefs.remove('km_refresh_token');
+  }
+
+  /// Comprueba que `baseUrl` responde como un backend de Kantu Market.
+  ///
+  /// Devuelve `null` cuando la conexión es buena, o una frase explicando qué
+  /// falló. Existe porque el fallo típico en un teléfono real —la URL apunta a
+  /// una máquina inalcanzable— es indistinguible del modo autónomo: la app
+  /// abre igual, pero con la base local y sin las cuentas del equipo.
+  Future<String?> probarConexion(String baseUrl) async {
+    final limpio = baseUrl.trim();
+    if (limpio.isEmpty) return 'Escribe la URL del servidor.';
+
+    final uri = Uri.tryParse('$limpio${ApiConstants.catalogoTiendas}');
+    if (uri == null || !uri.isAbsolute || !uri.scheme.startsWith('http')) {
+      return 'La URL no es válida. Debe empezar con http:// o https:// y '
+          'terminar en /api (por ejemplo http://192.168.1.10:8000/api).';
+    }
+
+    try {
+      final res = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) return null;
+      if (res.statusCode == 404) {
+        return 'El servidor respondió, pero no encontró $limpio${ApiConstants.catalogoTiendas}. '
+            'Revisa que la URL termine en /api.';
+      }
+      return 'El servidor respondió con el código ${res.statusCode}.';
+    } on TimeoutException {
+      return 'El servidor no respondió en 8 segundos. Si es una PC de la red, '
+          'levanta Django con 0.0.0.0 y revisa el firewall de Windows.';
+    } on SocketException catch (e) {
+      return 'No se pudo conectar (${e.osError?.message ?? 'red inalcanzable'}). '
+          'Recuerda que 10.0.2.2 y localhost sólo funcionan dentro del emulador: '
+          'en un teléfono hay que usar la IP de la PC o la URL pública.';
+    } catch (e) {
+      return 'No se pudo conectar: $e';
+    }
   }
 
   Uri _uri(String endpoint, [Map<String, String>? query]) {
