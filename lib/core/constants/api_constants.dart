@@ -10,13 +10,13 @@ class ApiConstants {
     defaultValue: 'https://kantumarket.vercel.app/api',
   );
 
-  // Valores por defecto de partida
-  static const String defaultEmulatorUrl = 'https://kantumarket.vercel.app/api';
-  static const String defaultLocalhostUrl = 'https://kantumarket.vercel.app/api';
+  /// El despliegue del proyecto: la misma base de datos que ve la web.
+  /// Es el único servidor al que apunta la app mientras no se compile con otro.
+  static const String apiProduccion = 'https://kantumarket.vercel.app/api';
 
   /// URL con la que arranca una instalación nueva.
   static String get urlInicial =>
-      buildBaseUrl.isNotEmpty ? buildBaseUrl : defaultEmulatorUrl;
+      buildBaseUrl.isNotEmpty ? buildBaseUrl : apiProduccion;
 
   /// Un APK compilado con `API_BASE_URL` arranca ya en modo servidor: es la
   /// diferencia entre "abre y muestra los datos reales" y "abre con la base

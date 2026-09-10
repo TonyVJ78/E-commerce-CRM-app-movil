@@ -31,7 +31,19 @@ class TiendaService extends ChangeNotifier {
             notifyListeners();
             return;
           }
-        } catch (_) {}
+          _errorMessage = 'El servidor no devolvió tus tiendas (código ${res.statusCode}).';
+        } catch (_) {
+          _errorMessage = 'No se pudieron cargar tus tiendas: el servidor no responde. '
+              'Revisa tu conexión y desliza para reintentar.';
+        }
+
+        // En modo servidor no se rellena con las tiendas locales: pertenecen a
+        // las cuentas de prueba del dispositivo, así que mostrarlas haría creer
+        // que la cuenta no tiene tiendas, o peor, que tiene otras.
+        _tiendas = [];
+        _isLoading = false;
+        notifyListeners();
+        return;
       }
 
       // Base de datos Local

@@ -152,10 +152,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 runSpacing: 8,
                 children: [
                   _PresetChip(
-                    etiqueta: 'Emulador',
-                    onTap: () => _usarPreset(ApiConstants.defaultEmulatorUrl),
+                    etiqueta: 'Servidor del proyecto',
+                    onTap: () => _usarPreset(ApiConstants.apiProduccion),
                   ),
-                  if (ApiConstants.buildBaseUrl.isNotEmpty)
+                  if (ApiConstants.buildBaseUrl.isNotEmpty &&
+                      ApiConstants.buildBaseUrl != ApiConstants.apiProduccion)
                     _PresetChip(
                       etiqueta: 'La de esta versión',
                       onTap: () => _usarPreset(ApiConstants.buildBaseUrl),
@@ -164,13 +165,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'La dirección debe terminar en /api.\n'
-                '• Emulador de Android Studio: http://10.0.2.2:8000/api\n'
-                '• Teléfono en la misma WiFi que la PC: http://IP-DE-LA-PC:8000/api\n'
-                '  (en la PC, Django debe correr con 0.0.0.0)\n'
-                '• Servidor publicado: la URL https del despliegue + /api\n\n'
-                'Ojo: 10.0.2.2 y localhost sólo existen dentro del emulador. En un '
-                'teléfono real nunca van a funcionar.',
+                'Normalmente no hay nada que cambiar aquí: la app ya viene '
+                'apuntando al servidor del proyecto, que es donde están las '
+                'tiendas, los productos y las cuentas del equipo.\n\n'
+                'Si escribes otra dirección debe terminar en /api. Ten en '
+                'cuenta que 10.0.2.2 y localhost sólo existen dentro del '
+                'emulador: en un teléfono real nunca van a funcionar.',
                 style: TextStyle(fontSize: 11.5, color: KantuColors.textMuted, height: 1.5),
               ),
               const SizedBox(height: 16),

@@ -178,14 +178,18 @@ class _DashboardEmpresaScreenState extends State<DashboardEmpresaScreen> {
                   children: [
                     const Text('🏢', style: TextStyle(fontSize: 40)),
                     const SizedBox(height: 10),
-                    const Text(
-                      'Aún no tienes tiendas',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                    Text(
+                      tiendaService.errorMessage != null
+                          ? 'No se pudieron cargar tus tiendas'
+                          : 'Aún no tienes tiendas',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Crea una desde la pestaña Tiendas para empezar a cargar tu catálogo.',
-                      style: TextStyle(fontSize: 12, color: KantuColors.textSecondary),
+                    Text(
+                      tiendaService.errorMessage ??
+                          'Crea una desde la pestaña Tiendas para empezar a cargar tu catálogo.',
+                      style: const TextStyle(fontSize: 12, color: KantuColors.textSecondary),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),

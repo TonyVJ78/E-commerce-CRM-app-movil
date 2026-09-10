@@ -107,8 +107,16 @@ class DashboardService extends ChangeNotifier {
             return;
           }
         } catch (_) {
-          // Cae al cálculo local.
+          _errorMessage = 'No se pudo cargar el resumen: el servidor no responde.';
         }
+
+        // Igual que con las tiendas: los números locales son de otra cuenta y
+        // pasarían por buenos sin que nada lo advierta.
+        _resumen = const ResumenVendedor();
+        _desdeServidor = false;
+        _isLoading = false;
+        notifyListeners();
+        return;
       }
 
       final datos = await DatabaseHelper.instance.getDashboardVendedor(usuario.id);

@@ -14,9 +14,17 @@ class ApiService {
   static final ApiService instance = ApiService._init();
   ApiService._init();
 
-  /// Tiempo máximo de espera por petición. Corto a propósito: si el backend
-  /// remoto no responde, se cae rápido al modo local en vez de congelar la UI.
-  static const Duration _timeout = Duration(seconds: 4);
+  /// Tiempo máximo de espera por petición.
+  ///
+  /// Antes eran 4 segundos, pensados para un Django corriendo en la misma red,
+  /// donde responder tarda milisegundos. Contra el despliegue en la nube ese
+  /// margen es demasiado justo: medido, el login tarda ~2,2 s y el dashboard
+  /// ~2,5 s ya estando caliente, y un arranque en frío o una red móvil se pasan
+  /// de 4 s sin esfuerzo. Cuando eso ocurría la app se rendía y caía a la base
+  /// local sin avisar, y la empresa aparecía sin tiendas porque las locales
+  /// pertenecen a otra cuenta. Rendirse tarde es mucho mejor que mostrar datos
+  /// que no son.
+  static const Duration _timeout = Duration(seconds: 20);
 
   String _baseUrl = ApiConstants.urlInicial;
   bool _useOnlineBackend = ApiConstants.onlinePorDefecto;
@@ -226,7 +234,7 @@ class ApiService {
     List<String> archivos = const [],
     String campoArchivo = 'imagenes',
     bool auth = true,
-    Duration timeout = const Duration(seconds: 30),
+    Duration timeout = const Duration(seconds: 60),
   }) async {
     Future<http.Response> enviar() async {
       final request = http.MultipartRequest('POST', _uri(endpoint))

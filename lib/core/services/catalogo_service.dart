@@ -101,10 +101,16 @@ class CatalogoService extends ChangeNotifier {
     final tiendaEfectiva = tiendaId ?? _selectedTiendaId;
 
     try {
-      await _loadTiendas();
-
       if (_online) {
-        final ok = await _loadCatalogoRemoto(tiendaId: tiendaEfectiva);
+        // Las tiendas y el catálogo no dependen entre sí, así que se piden a la
+        // vez. Encadenadas eran tres viajes seguidos al servidor de la nube
+        // —unos cinco segundos de pantalla en blanco—; en paralelo la espera es
+        // la de la petición más lenta.
+        final resultados = await Future.wait([
+          _loadTiendas(),
+          _loadCatalogoRemoto(tiendaId: tiendaEfectiva),
+        ]);
+        final ok = resultados[1] == true;
         if (ok) {
           _isLoading = false;
           notifyListeners();
@@ -112,6 +118,8 @@ class CatalogoService extends ChangeNotifier {
         }
         _errorMessage = 'No se pudo contactar al servidor. Mostrando el catálogo '
             'guardado en este dispositivo.';
+      } else {
+        await _loadTiendas();
       }
 
       _categorias = await DatabaseHelper.instance.getCategorias(tiendaId: tiendaEfectiva);
@@ -139,13 +147,13 @@ class CatalogoService extends ChangeNotifier {
 
   /// Tiendas activas para el filtro de la vitrina. Si el servidor no contesta
   /// se queda con las locales, para que el filtro nunca aparezca vacío.
-  Future<void> _loadTiendas() async {
+  Future<bool> _loadTiendas() async {
     if (_online) {
       try {
         final res = await ApiService.instance.get(ApiConstants.catalogoTiendas);
         if (res.statusCode == 200) {
           _tiendas = _comoLista(res.body).map((t) => Tienda.fromJson(t)).toList();
-          return;
+          return true;
         }
       } catch (_) {
         // Cae a las locales.
@@ -157,15 +165,41 @@ class CatalogoService extends ChangeNotifier {
     } catch (_) {
       _tiendas = [];
     }
+    return false;
   }
 
   Future<bool> _loadCatalogoRemoto({int? tiendaId}) async {
     try {
-      final categoriasRes = await ApiService.instance.get(
-        ApiConstants.catalogoCategorias,
-        auth: true,
-        query: {if (tiendaId != null) 'tienda': '$tiendaId'},
-      );
+      // El nombre sale de la lista de categorías que el usuario está viendo, así
+      // que se resuelve antes de pedir nada y las dos peticiones pueden salir a
+      // la vez en vez de una detrás de otra.
+      final categoriaNombre = selectedCategoriaNombre;
+
+      final respuestas = await Future.wait([
+        ApiService.instance.get(
+          ApiConstants.catalogoCategorias,
+          auth: true,
+          query: {if (tiendaId != null) 'tienda': '$tiendaId'},
+        ),
+        // Con una tienda fija el id de categoría es exacto; sin ella se filtra
+        // por nombre para juntar la misma categoría de todas las tiendas.
+        ApiService.instance.get(
+          ApiConstants.catalogoProductos,
+          auth: true,
+          query: {
+            if (tiendaId != null) 'tienda': '$tiendaId',
+            if (_selectedCategoriaId != null && tiendaId != null)
+              'categoria': '$_selectedCategoriaId',
+            if (_selectedCategoriaId != null && tiendaId == null && categoriaNombre != null)
+              'categoria_nombre': categoriaNombre,
+            if (_searchQuery.trim().isNotEmpty) 'q': _searchQuery.trim(),
+          },
+        ),
+      ]);
+
+      final categoriasRes = respuestas[0];
+      final productosRes = respuestas[1];
+
       if (categoriasRes.statusCode == 200) {
         _categorias = _comoLista(categoriasRes.body).map((c) => Categoria.fromJson(c)).toList();
         // Sin tienda, el listado trae una fila por cada tienda que use ese
@@ -174,21 +208,6 @@ class CatalogoService extends ChangeNotifier {
         if (tiendaId == null) _categorias = _sinNombresRepetidos(_categorias);
       }
 
-      // Con una tienda fija el id de categoría es exacto; sin ella se filtra
-      // por nombre para juntar la misma categoría de todas las tiendas.
-      final categoriaNombre = selectedCategoriaNombre;
-      final productosRes = await ApiService.instance.get(
-        ApiConstants.catalogoProductos,
-        auth: true,
-        query: {
-          if (tiendaId != null) 'tienda': '$tiendaId',
-          if (_selectedCategoriaId != null && tiendaId != null)
-            'categoria': '$_selectedCategoriaId',
-          if (_selectedCategoriaId != null && tiendaId == null && categoriaNombre != null)
-            'categoria_nombre': categoriaNombre,
-          if (_searchQuery.trim().isNotEmpty) 'q': _searchQuery.trim(),
-        },
-      );
       if (productosRes.statusCode != 200) return false;
 
       _productos = _comoLista(productosRes.body).map((p) => Producto.fromJson(p)).toList();

@@ -100,19 +100,29 @@ class _TiendasEmpresaScreenState extends State<TiendasEmpresaScreen> {
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: KantuColors.border),
                       ),
-                      child: const Column(
+                      // Una lista vacía porque el servidor falló no es lo
+                      // mismo que una cuenta sin tiendas, y confundirlas hacía
+                      // creer a la empresa que había perdido las suyas.
+                      child: Column(
                         children: [
-                          Text('🏢', style: TextStyle(fontSize: 48)),
-                          SizedBox(height: 12),
                           Text(
-                            'No tienes ninguna tienda registrada',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                            tiendaService.errorMessage != null ? '📡' : '🏢',
+                            style: const TextStyle(fontSize: 48),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            tiendaService.errorMessage != null
+                                ? 'No se pudieron cargar tus tiendas'
+                                : 'No tienes ninguna tienda registrada',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                             textAlign: TextAlign.center,
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
-                            'Crea tu primera tienda con el botón "Nueva Tienda".',
-                            style: TextStyle(fontSize: 13, color: KantuColors.textSecondary),
+                            tiendaService.errorMessage ??
+                                'Crea tu primera tienda con el botón "Nueva Tienda".',
+                            style: const TextStyle(
+                                fontSize: 13, color: KantuColors.textSecondary),
                             textAlign: TextAlign.center,
                           ),
                         ],
