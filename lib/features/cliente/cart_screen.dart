@@ -65,10 +65,17 @@ class _CartScreenState extends State<CartScreen> {
               });
               return;
             }
-            Stripe.publishableKey = intento['publishable_key'] as String;
-            await Stripe.instance.applySettings();
-            clientSecret = intento['client_secret'] as String;
-            setModalState(() => cargandoStripe = false);
+            try {
+              Stripe.publishableKey = intento['publishable_key'] as String;
+              await Stripe.instance.applySettings();
+              clientSecret = intento['client_secret'] as String;
+              setModalState(() => cargandoStripe = false);
+            } catch (e) {
+              setModalState(() {
+                cargandoStripe = false;
+                stripeError = 'No se pudo inicializar el pago con tarjeta: $e';
+              });
+            }
           }
 
           Future<void> confirmarPago() async {
@@ -178,7 +185,9 @@ class _CartScreenState extends State<CartScreen> {
                     border: Border.all(color: KantuColors.border),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Column(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: Column(
                     children: [
                       _OpcionPago(
                         emoji: '📱',
@@ -216,6 +225,7 @@ class _CartScreenState extends State<CartScreen> {
                         },
                       ),
                     ],
+                    ),
                   ),
                 ),
 
@@ -227,19 +237,52 @@ class _CartScreenState extends State<CartScreen> {
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Center(child: CircularProgressIndicator()),
                     )
-                  else if (clientSecret != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: KantuColors.border),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: CardField(
-                        onCardChanged: (details) {
-                          setModalState(() => tarjetaCompleta = details?.complete ?? false);
-                        },
-                      ),
+                  else if (clientSecret != null) ...[
+                    const Text(
+                      'Datos de la tarjeta',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: KantuColors.textPrimary),
                     ),
+                    const SizedBox(height: 6),
+                    CardField(
+                      style: const TextStyle(fontSize: 14, color: KantuColors.textPrimary),
+                      cursorColor: KantuColors.primary,
+                      numberHintText: 'Número de tarjeta',
+                      expirationHintText: 'MM/AA',
+                      cvcHintText: 'CVC',
+                      decoration: InputDecoration(
+                        hintStyle: const TextStyle(fontSize: 13, color: KantuColors.textMuted),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: KantuColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: KantuColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: KantuColors.primary, width: 1.5),
+                        ),
+                      ),
+                      onCardChanged: (details) {
+                        setModalState(() => tarjetaCompleta = details?.complete ?? false);
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    const Row(
+                      children: [
+                        Icon(Icons.lock_outline, size: 12, color: KantuColors.textMuted),
+                        SizedBox(width: 4),
+                        Text(
+                          'Pago seguro procesado por Stripe',
+                          style: TextStyle(fontSize: 11, color: KantuColors.textMuted),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (stripeError != null) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -654,13 +697,32 @@ class _OpcionPago extends StatelessWidget {
 
     return InkWell(
       onTap: () => onTap(valor),
-      child: Padding(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        color: activo ? KantuColors.primaryLight : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Text('$emoji ', style: const TextStyle(fontSize: 20)),
+            Container(
+              width: 34,
+              height: 34,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: activo ? Colors.white : KantuColors.background,
+                shape: BoxShape.circle,
+              ),
+              child: Text(emoji, style: const TextStyle(fontSize: 16)),
+            ),
+            const SizedBox(width: 12),
             Expanded(
-              child: Text(texto, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              child: Text(
+                texto,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: activo ? KantuColors.primaryDark : KantuColors.textPrimary,
+                ),
+              ),
             ),
             Icon(
               activo ? Icons.radio_button_checked : Icons.radio_button_off,
