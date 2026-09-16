@@ -6,11 +6,13 @@ import '../../core/models/producto.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/cart_service.dart';
 import '../../core/services/catalogo_service.dart';
+import '../../core/services/recommendation_service.dart';
 import '../shared/home_shell.dart';
 import '../shared/kantu_app_bar.dart';
 import '../shared/kantu_search_field.dart';
 import '../shared/producto_imagen.dart';
 import 'producto_detail_sheet.dart';
+import 'recomendaciones_section.dart';
 
 /// Vitrina del cliente (CU-11). En modo servidor lee el catálogo público
 /// (`/api/catalogo/productos/`, con búsqueda y filtro del lado del servidor) y
@@ -24,15 +26,25 @@ class HomeClienteScreen extends StatefulWidget {
 
 class _HomeClienteScreenState extends State<HomeClienteScreen> {
   final _searchController = TextEditingController();
+  final Map<int, String> _stores = {};
+  int? _selectedStoreId;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final catalogo = context.read<CatalogoService>();
+      final cart = context.read<CartService>();
+      final currentUser = context.read<AuthService>().currentUser;
       catalogo.limpiarFiltros();
-      catalogo.loadCatalogo();
-      context.read<CartService>().loadCarrito(context.read<AuthService>().currentUser);
+      await catalogo.loadCatalogo();
+      if (!mounted) return;
+      setState(() {
+        for (final product in catalogo.productos) {
+          _stores[product.tiendaId] = product.tiendaNombre;
+        }
+      });
+      cart.loadCarrito(currentUser);
     });
   }
 
@@ -42,13 +54,45 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
     super.dispose();
   }
 
-  Future<void> _abrirDetalle(Producto producto) {
+  Future<void> _abrirDetalle(Producto producto) async {
+    context.read<RecommendationService>().registerInteraction(
+      tiendaId: producto.tiendaId,
+      productoId: producto.id,
+      type: 'CLICK',
+    );
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ProductoDetailSheet(producto: producto),
     );
+  }
+
+  Future<void> _selectStore(int? storeId) async {
+    setState(() => _selectedStoreId = storeId);
+    final catalog = context.read<CatalogoService>();
+    catalog.limpiarFiltros();
+    _searchController.clear();
+    await catalog.loadCatalogo(tiendaId: storeId);
+    if (mounted && storeId == null) {
+      setState(() {
+        for (final product in catalog.productos) {
+          _stores[product.tiendaId] = product.tiendaNombre;
+        }
+      });
+    }
+  }
+
+  void _search(String value) {
+    final catalog = context.read<CatalogoService>();
+    catalog.setSearch(value, tiendaId: _selectedStoreId);
+    if (_selectedStoreId != null && value.trim().isNotEmpty) {
+      context.read<RecommendationService>().registerInteraction(
+        tiendaId: _selectedStoreId!,
+        type: 'SEARCH',
+        searchTerm: value,
+      );
+    }
   }
 
   /// Agregado rápido desde la tarjeta: sólo tiene sentido cuando no hay que
@@ -74,9 +118,11 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(ok
-              ? '¡${producto.nombre} agregado!'
-              : (cart.errorMessage ?? 'No se pudo agregar al carrito.')),
+          content: Text(
+            ok
+                ? '¡${producto.nombre} agregado!'
+                : (cart.errorMessage ?? 'No se pudo agregar al carrito.'),
+          ),
           duration: const Duration(seconds: 2),
           backgroundColor: ok ? KantuColors.success : KantuColors.error,
         ),
@@ -107,12 +153,17 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                   foregroundColor: KantuColors.primary,
                   backgroundColor: KantuColors.primaryLight,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 icon: const Icon(Icons.shopping_bag_outlined, size: 16),
                 label: Text(
                   'Bs. ${cart.totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 onPressed: () => HomeShellScope.of(context)?.irATab(1),
               ),
@@ -136,19 +187,52 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                       hint: 'Buscar textiles, artesanías, café...',
                       // Sólo al enviar: en modo servidor buscar por tecla sería
                       // una petición por carácter.
-                      onSubmitted: catalogo.setSearch,
+                      onSubmitted: _search,
                       onChanged: (valor) {
                         setState(() {});
-                        if (valor.isEmpty) catalogo.setSearch('');
+                        if (valor.isEmpty) {
+                          catalogo.setSearch('', tiendaId: _selectedStoreId);
+                        }
                       },
                       onLimpiar: () {
                         _searchController.clear();
-                        catalogo.setSearch('');
+                        catalogo.setSearch('', tiendaId: _selectedStoreId);
                         setState(() {});
                       },
                     ),
                   ),
                   const SizedBox(height: 16),
+
+                  if (_stores.isNotEmpty) ...[
+                    SizedBox(
+                      height: 38,
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('Todas las tiendas'),
+                            selected: _selectedStoreId == null,
+                            onSelected: (_) => _selectStore(null),
+                          ),
+                          const SizedBox(width: 8),
+                          for (final entry in _stores.entries) ...[
+                            ChoiceChip(
+                              label: Text(
+                                entry.value.isEmpty
+                                    ? 'Tienda ${entry.key}'
+                                    : entry.value,
+                              ),
+                              selected: _selectedStoreId == entry.key,
+                              onSelected: (_) => _selectStore(entry.key),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   if (catalogo.categorias.isNotEmpty) ...[
                     Padding(
@@ -156,7 +240,8 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                       child: FiltrosCategoria(
                         categorias: [
                           (id: null, nombre: 'Todos'),
-                          for (final c in catalogo.categorias) (id: c.id, nombre: c.nombre),
+                          for (final c in catalogo.categorias)
+                            (id: c.id, nombre: c.nombre),
                         ],
                         seleccionada: catalogo.selectedCategoriaId,
                         onSeleccionar: catalogo.setCategoria,
@@ -180,12 +265,22 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                         ),
                         Text(
                           '${catalogo.productos.length} items',
-                          style: const TextStyle(fontSize: 12, color: KantuColors.textSecondary),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: KantuColors.textSecondary,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
+
+                  if (_selectedStoreId != null)
+                    RecomendacionesSection(
+                      key: ValueKey('recommendations-$_selectedStoreId'),
+                      tiendaId: _selectedStoreId!,
+                      onProductTap: _abrirDetalle,
+                    ),
                 ],
               ),
             ),
@@ -195,7 +290,9 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                 child: Center(
                   child: Padding(
                     padding: EdgeInsets.all(32),
-                    child: CircularProgressIndicator(color: KantuColors.primary),
+                    child: CircularProgressIndicator(
+                      color: KantuColors.primary,
+                    ),
                   ),
                 ),
               )
@@ -211,17 +308,14 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                     crossAxisSpacing: 12,
                     childAspectRatio: 0.66,
                   ),
-                  delegate: SliverChildBuilderDelegate(
-                    (ctx, idx) {
-                      final producto = catalogo.productos[idx];
-                      return _TarjetaProducto(
-                        producto: producto,
-                        onTap: () => _abrirDetalle(producto),
-                        onAgregar: () => _agregarRapido(producto),
-                      );
-                    },
-                    childCount: catalogo.productos.length,
-                  ),
+                  delegate: SliverChildBuilderDelegate((ctx, idx) {
+                    final producto = catalogo.productos[idx];
+                    return _TarjetaProducto(
+                      producto: producto,
+                      onTap: () => _abrirDetalle(producto),
+                      onAgregar: () => _agregarRapido(producto),
+                    );
+                  }, childCount: catalogo.productos.length),
                 ),
               ),
           ],
@@ -269,7 +363,11 @@ class _HeroBanner extends StatelessWidget {
                 SizedBox(width: 6),
                 Text(
                   'Mercado Digital Boliviano',
-                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ],
             ),
@@ -277,7 +375,11 @@ class _HeroBanner extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             '¡Hola, $nombre! 👋',
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white),
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
           ),
           const SizedBox(height: 4),
           const Text(
@@ -313,7 +415,11 @@ class _TarjetaProducto extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: KantuColors.border),
           boxShadow: [
-            BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(
+              color: Colors.black.withAlpha(5),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Column(
@@ -332,14 +438,21 @@ class _TarjetaProducto extends StatelessWidget {
                     top: 8,
                     left: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: KantuColors.error,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(
                         'AGOTADO',
-                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   )
@@ -348,7 +461,10 @@ class _TarjetaProducto extends StatelessWidget {
                     top: 8,
                     left: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: KantuColors.accent,
                         borderRadius: BorderRadius.circular(6),
@@ -373,7 +489,9 @@ class _TarjetaProducto extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      producto.tiendaNombre.isNotEmpty ? producto.tiendaNombre : 'Kantu Market',
+                      producto.tiendaNombre.isNotEmpty
+                          ? producto.tiendaNombre
+                          : 'Kantu Market',
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -398,7 +516,10 @@ class _TarjetaProducto extends StatelessWidget {
                     if (producto.tieneVariasVariantes)
                       Text(
                         '${producto.variantesActivas.length} presentaciones',
-                        style: const TextStyle(fontSize: 10, color: KantuColors.textMuted),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: KantuColors.textMuted,
+                        ),
                       ),
                     const SizedBox(height: 4),
                     Row(
@@ -421,13 +542,17 @@ class _TarjetaProducto extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              color: agotado ? KantuColors.border : KantuColors.primaryLight,
+                              color: agotado
+                                  ? KantuColors.border
+                                  : KantuColors.primaryLight,
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
                               Icons.add_shopping_cart,
                               size: 16,
-                              color: agotado ? KantuColors.textMuted : KantuColors.primary,
+                              color: agotado
+                                  ? KantuColors.textMuted
+                                  : KantuColors.primary,
                             ),
                           ),
                         ),

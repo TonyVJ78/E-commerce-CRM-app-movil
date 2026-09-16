@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'core/constants/colors.dart';
 import 'core/services/api_service.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/cart_service.dart';
 import 'core/services/catalogo_service.dart';
 import 'core/services/dashboard_service.dart';
+import 'core/services/recommendation_service.dart';
 import 'core/services/tienda_service.dart';
 import 'features/auth/login_screen.dart';
 import 'features/shared/home_shell.dart';
@@ -22,9 +24,16 @@ void main() async {
       providers: [
         ChangeNotifierProvider<AuthService>.value(value: authService),
         ChangeNotifierProvider<TiendaService>(create: (_) => TiendaService()),
-        ChangeNotifierProvider<CatalogoService>(create: (_) => CatalogoService()),
+        ChangeNotifierProvider<CatalogoService>(
+          create: (_) => CatalogoService(),
+        ),
         ChangeNotifierProvider<CartService>(create: (_) => CartService()),
-        ChangeNotifierProvider<DashboardService>(create: (_) => DashboardService()),
+        ChangeNotifierProvider<DashboardService>(
+          create: (_) => DashboardService(),
+        ),
+        ChangeNotifierProvider<RecommendationService>(
+          create: (_) => RecommendationService(),
+        ),
       ],
       child: const KantuMarketApp(),
     ),
@@ -59,13 +68,17 @@ class KantuMarketApp extends StatelessWidget {
         dialogTheme: DialogThemeData(
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
         ),
         popupMenuTheme: PopupMenuThemeData(
           color: Colors.white,
           surfaceTintColor: Colors.transparent,
           elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
         bottomSheetTheme: const BottomSheetThemeData(
           backgroundColor: Colors.white,
@@ -79,7 +92,9 @@ class KantuMarketApp extends StatelessWidget {
             fontWeight: FontWeight.w600,
             color: Colors.white,
           ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
         scaffoldBackgroundColor: KantuColors.background,
       ),

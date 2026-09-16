@@ -19,8 +19,10 @@ class ApiConstants {
   static const String dashboardVendedor = '/tiendas/dashboard/';
 
   // --- Catálogo de la empresa (CU-08 y CU-09) ---
-  static String categoriasTienda(int tiendaId) => '/tiendas/$tiendaId/categorias/';
-  static String productosTienda(int tiendaId) => '/tiendas/$tiendaId/productos/';
+  static String categoriasTienda(int tiendaId) =>
+      '/tiendas/$tiendaId/categorias/';
+  static String productosTienda(int tiendaId) =>
+      '/tiendas/$tiendaId/productos/';
   static String productoDetalle(int tiendaId, int productoId) =>
       '/tiendas/$tiendaId/productos/$productoId/';
 
@@ -31,5 +33,12 @@ class ApiConstants {
   // --- Carrito (CU-11) ---
   static const String carrito = '/pedidos/carrito/';
   static const String carritoItems = '/pedidos/carrito/items/';
-  static String carritoItemDetalle(int itemId) => '/pedidos/carrito/items/$itemId/';
+  static String carritoItemDetalle(int itemId) =>
+      '/pedidos/carrito/items/$itemId/';
+
+  // --- Recomendaciones personalizadas (CU-14) ---
+  static String recomendacionesTienda(int tiendaId) =>
+      '/recomendaciones/tiendas/$tiendaId/';
+  static const String recomendacionesInteracciones =
+      '/recomendaciones/interacciones/';
 }

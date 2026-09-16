@@ -5,6 +5,7 @@ import '../../core/constants/colors.dart';
 import '../../core/models/producto.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/cart_service.dart';
+import '../../core/services/recommendation_service.dart';
 import '../shared/custom_button.dart';
 import '../shared/producto_imagen.dart';
 
@@ -30,6 +31,14 @@ class _ProductoDetailSheetState extends State<ProductoDetailSheet> {
   void initState() {
     super.initState();
     _variante = widget.producto.variantePrincipal;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<RecommendationService>().registerInteraction(
+        tiendaId: widget.producto.tiendaId,
+        productoId: widget.producto.id,
+        type: 'VIEW',
+      );
+    });
   }
 
   int get _stockDisponible => _variante?.stock ?? 0;
@@ -125,7 +134,10 @@ class _ProductoDetailSheetState extends State<ProductoDetailSheet> {
                   children: [
                     Flexible(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: KantuColors.primaryLight,
                           borderRadius: BorderRadius.circular(8),
@@ -143,9 +155,14 @@ class _ProductoDetailSheetState extends State<ProductoDetailSheet> {
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
-                        color: _sinStock ? KantuColors.error.withAlpha(25) : KantuColors.successLight,
+                        color: _sinStock
+                            ? KantuColors.error.withAlpha(25)
+                            : KantuColors.successLight,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -153,7 +170,9 @@ class _ProductoDetailSheetState extends State<ProductoDetailSheet> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: _sinStock ? KantuColors.error : KantuColors.success,
+                          color: _sinStock
+                              ? KantuColors.error
+                              : KantuColors.success,
                         ),
                       ),
                     ),
@@ -204,7 +223,11 @@ class _ProductoDetailSheetState extends State<ProductoDetailSheet> {
                   p.descripcion.isNotEmpty
                       ? p.descripcion
                       : 'Producto artesanal de alta calidad garantizada.',
-                  style: const TextStyle(fontSize: 14, color: KantuColors.textSecondary, height: 1.4),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: KantuColors.textSecondary,
+                    height: 1.4,
+                  ),
                 ),
 
                 if (p.etiquetas.isNotEmpty) ...[
@@ -215,14 +238,20 @@ class _ProductoDetailSheetState extends State<ProductoDetailSheet> {
                     children: [
                       for (final etiqueta in p.etiquetas)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: KantuColors.accentLight,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             '#$etiqueta',
-                            style: const TextStyle(fontSize: 11, color: KantuColors.accentDark),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: KantuColors.accentDark,
+                            ),
                           ),
                         ),
                     ],
@@ -275,11 +304,16 @@ class _ProductoDetailSheetState extends State<ProductoDetailSheet> {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.remove, size: 18),
-                            onPressed: _cantidad > 1 ? () => setState(() => _cantidad--) : null,
+                            onPressed: _cantidad > 1
+                                ? () => setState(() => _cantidad--)
+                                : null,
                           ),
                           Text(
                             '$_cantidad',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                           IconButton(
                             icon: const Icon(Icons.add, size: 18),
@@ -356,7 +390,9 @@ class _ChipVariante extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: seleccionada ? KantuColors.primary : KantuColors.textPrimary,
+                  color: seleccionada
+                      ? KantuColors.primary
+                      : KantuColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),
@@ -364,7 +400,10 @@ class _ChipVariante extends StatelessWidget {
                 agotada
                     ? 'Agotada'
                     : 'Bs. ${variante.precioEfectivo.toStringAsFixed(2)} · ${variante.stock} u.',
-                style: const TextStyle(fontSize: 11, color: KantuColors.textSecondary),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: KantuColors.textSecondary,
+                ),
               ),
             ],
           ),
