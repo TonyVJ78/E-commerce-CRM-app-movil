@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/colors.dart';
@@ -36,116 +37,244 @@ class _CartScreenState extends State<CartScreen> {
     final cartService = context.read<CartService>();
     final authService = context.read<AuthService>();
 
+    // Estado del pago con tarjeta (CU-19), local a este modal: el PaymentIntent
+    // se crea contra el backend real recién al elegir "Stripe", y el campo de
+    // tarjeta se confirma sin salir de la app ni de esta hoja inferior.
+    String? clientSecret;
+    bool cargandoStripe = false;
+    bool pagandoStripe = false;
+    bool tarjetaCompleta = false;
+    String? stripeError;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: KantuColors.border,
-                    borderRadius: BorderRadius.circular(2),
+        builder: (context, setModalState) {
+          Future<void> iniciarPagoStripe() async {
+            setModalState(() {
+              cargandoStripe = true;
+              stripeError = null;
+            });
+            final intento = await cartService.crearIntentoPagoStripe();
+            if (intento == null) {
+              setModalState(() {
+                cargandoStripe = false;
+                stripeError = cartService.errorMessage ?? 'No se pudo iniciar el pago con Stripe.';
+              });
+              return;
+            }
+            Stripe.publishableKey = intento['publishable_key'] as String;
+            await Stripe.instance.applySettings();
+            clientSecret = intento['client_secret'] as String;
+            setModalState(() => cargandoStripe = false);
+          }
+
+          Future<void> confirmarPago() async {
+            final cliente = authService.currentUser;
+            if (cliente == null) return;
+
+            if (_metodoPago != 'Stripe') {
+              final modalNav = Navigator.of(ctx);
+              final pedido = await cartService.checkout(cliente: cliente, metodoPago: _metodoPago);
+              if (!mounted) return;
+              modalNav.pop();
+              if (pedido != null) _mostrarExito(pedido.id);
+              return;
+            }
+
+            if (clientSecret == null) return;
+            setModalState(() {
+              pagandoStripe = true;
+              stripeError = null;
+            });
+
+            String paymentIntentId;
+            try {
+              final resultado = await Stripe.instance.confirmPayment(
+                paymentIntentClientSecret: clientSecret!,
+                data: const PaymentMethodParams.card(paymentMethodData: PaymentMethodData()),
+              );
+              if (resultado.status != PaymentIntentsStatus.Succeeded) {
+                setModalState(() {
+                  pagandoStripe = false;
+                  stripeError = 'El pago no se completó. Intenta nuevamente.';
+                });
+                return;
+              }
+              paymentIntentId = resultado.id;
+            } on StripeException catch (e) {
+              setModalState(() {
+                pagandoStripe = false;
+                stripeError = e.error.localizedMessage ?? 'No se pudo procesar el pago con tarjeta.';
+              });
+              return;
+            }
+
+            final modalNav = Navigator.of(ctx);
+            final pedido = await cartService.checkoutStripeRemoto(
+              cliente: cliente,
+              paymentIntentId: paymentIntentId,
+            );
+
+            if (!mounted) return;
+            if (pedido == null) {
+              setModalState(() {
+                pagandoStripe = false;
+                stripeError = cartService.errorMessage ??
+                    'El pago se realizó pero no se pudo registrar el pedido. Contacta a soporte.';
+              });
+              return;
+            }
+
+            pagandoStripe = false;
+            modalNav.pop();
+            _mostrarExito(pedido.id);
+          }
+
+          final botonDeshabilitado = _metodoPago == 'Stripe'
+              ? (cargandoStripe || clientSecret == null || !tarjetaCompleta || pagandoStripe)
+              : false;
+
+          return Container(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 24,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: KantuColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Finalizar Pedido',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: KantuColors.textPrimary),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Método de Pago',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: KantuColors.textSecondary),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: KantuColors.border),
-                  borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 16),
+                const Text(
+                  'Finalizar Pedido',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: KantuColors.textPrimary),
                 ),
-                child: Column(
-                  children: [
-                    _OpcionPago(
-                      emoji: '📱',
-                      texto: 'QR Simple (Bancos de Bolivia)',
-                      valor: 'QR Simple (Bolivia)',
-                      seleccionado: _metodoPago,
-                      onTap: (valor) {
-                        setModalState(() => _metodoPago = valor);
-                        setState(() => _metodoPago = valor);
-                      },
+                const SizedBox(height: 16),
+                const Text(
+                  'Método de Pago',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: KantuColors.textSecondary),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: KantuColors.border),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      _OpcionPago(
+                        emoji: '📱',
+                        texto: 'QR Simple (Bancos de Bolivia)',
+                        valor: 'QR Simple (Bolivia)',
+                        seleccionado: _metodoPago,
+                        onTap: (valor) {
+                          setModalState(() => _metodoPago = valor);
+                          setState(() => _metodoPago = valor);
+                        },
+                      ),
+                      const Divider(height: 1),
+                      _OpcionPago(
+                        emoji: '💵',
+                        texto: 'Pago Contra Entrega (Efectivo)',
+                        valor: 'Efectivo',
+                        seleccionado: _metodoPago,
+                        onTap: (valor) {
+                          setModalState(() => _metodoPago = valor);
+                          setState(() => _metodoPago = valor);
+                        },
+                      ),
+                      const Divider(height: 1),
+                      _OpcionPago(
+                        emoji: '💳',
+                        texto: 'Tarjeta (Stripe)',
+                        valor: 'Stripe',
+                        seleccionado: _metodoPago,
+                        onTap: (valor) {
+                          setModalState(() => _metodoPago = valor);
+                          setState(() => _metodoPago = valor);
+                          if (clientSecret == null && !cargandoStripe) {
+                            iniciarPagoStripe();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Formulario de tarjeta, embebido debajo de las opciones al elegir Stripe.
+                if (_metodoPago == 'Stripe') ...[
+                  const SizedBox(height: 12),
+                  if (cargandoStripe)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (clientSecret != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: KantuColors.border),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: CardField(
+                        onCardChanged: (details) {
+                          setModalState(() => tarjetaCompleta = details?.complete ?? false);
+                        },
+                      ),
                     ),
-                    const Divider(height: 1),
-                    _OpcionPago(
-                      emoji: '💵',
-                      texto: 'Pago Contra Entrega (Efectivo)',
-                      valor: 'Efectivo',
-                      seleccionado: _metodoPago,
-                      onTap: (valor) {
-                        setModalState(() => _metodoPago = valor);
-                        setState(() => _metodoPago = valor);
-                      },
+                  if (stripeError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      stripeError!,
+                      style: const TextStyle(fontSize: 12, color: KantuColors.error),
+                    ),
+                  ],
+                ],
+
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total a pagar:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Bs. ${cartService.totalAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: KantuColors.primary,
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Total a pagar:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  Text(
-                    'Bs. ${cartService.totalAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: KantuColors.primary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              CustomButton(
-                text: 'Confirmar y Pagar',
-                isLoading: cartService.isLoading,
-                icon: Icons.check_circle_outline,
-                onPressed: () async {
-                  final cliente = authService.currentUser;
-                  if (cliente == null) return;
-
-                  final modalNav = Navigator.of(ctx);
-                  final pedido = await cartService.checkout(
-                    cliente: cliente,
-                    metodoPago: _metodoPago,
-                  );
-
-                  if (!mounted) return;
-                  modalNav.pop();
-                  if (pedido != null) _mostrarExito(pedido.id);
-                },
-              ),
-            ],
-          ),
-        ),
+                const SizedBox(height: 24),
+                CustomButton(
+                  text: _metodoPago == 'Stripe' ? 'Pagar con tarjeta' : 'Confirmar y Pagar',
+                  isLoading: cartService.isLoading || pagandoStripe,
+                  icon: Icons.check_circle_outline,
+                  onPressed: botonDeshabilitado ? null : confirmarPago,
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

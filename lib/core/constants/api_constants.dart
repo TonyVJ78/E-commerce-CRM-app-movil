@@ -50,8 +50,10 @@ class ApiConstants {
   /// también sirve de sonda para comprobar si el servidor está vivo.
   static const String catalogoTiendas = '/catalogo/tiendas/';
 
-  // --- Carrito (CU-11) ---
+  // --- Carrito (CU-11) y checkout con pasarela de pagos (CU-19) ---
   static const String carrito = '/pedidos/carrito/';
   static const String carritoItems = '/pedidos/carrito/items/';
   static String carritoItemDetalle(int itemId) => '/pedidos/carrito/items/$itemId/';
+  static const String carritoCheckout = '/pedidos/carrito/checkout/';
+  static const String carritoPagoIntento = '/pedidos/carrito/pago-intento/';
 }

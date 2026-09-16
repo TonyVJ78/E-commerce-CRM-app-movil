@@ -382,6 +382,91 @@ class CartService extends ChangeNotifier {
     }
   }
 
+  // =========================================================================
+  // Pago con tarjeta — Stripe (CU-19 / RF-M-05)
+  // =========================================================================
+
+  /// Crea el PaymentIntent de Stripe para el total actual del carrito remoto.
+  /// Solo tiene sentido en modo servidor: el pago se valida contra el backend.
+  Future<Map<String, dynamic>?> crearIntentoPagoStripe() async {
+    try {
+      final res = await ApiService.instance.post(ApiConstants.carritoPagoIntento, {}, auth: true);
+      if (res.statusCode != 200) {
+        _errorMessage = _mensajeError(res.body);
+        notifyListeners();
+        return null;
+      }
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      _errorMessage = 'No se pudo iniciar el pago con Stripe: $e';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Confirma la compra contra el backend real una vez que el pago con
+  /// Stripe ya se confirmó del lado del cliente.
+  ///
+  /// A diferencia de [checkout] (que solo escribe en SQLite y sólo procesa la
+  /// primera tienda), este método sí llama a `POST /pedidos/carrito/checkout/`
+  /// y liquida TODAS las tiendas del carrito en un único pedido por tienda,
+  /// igual que el checkout web: tiene que ser así porque el PaymentIntent ya
+  /// se cobró por el total combinado del carrito, no por una tienda sola.
+  Future<Pedido?> checkoutStripeRemoto({
+    required Usuario cliente,
+    required String paymentIntentId,
+  }) async {
+    if (_items.isEmpty) return null;
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final res = await ApiService.instance.post(
+        ApiConstants.carritoCheckout,
+        {'metodo_pago': 'stripe', 'payment_intent_id': paymentIntentId},
+        auth: true,
+      );
+
+      if (res.statusCode != 201) {
+        _errorMessage = _mensajeError(res.body);
+        _isLoading = false;
+        notifyListeners();
+        return null;
+      }
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final idsPedidos = (data['pedidos'] as List? ?? const [])
+          .map((e) => _entero(e))
+          .toList();
+      final primerTiendaId = _items.first.producto.tiendaId;
+
+      final pedido = Pedido(
+        id: idsPedidos.isNotEmpty ? idsPedidos.first : 0,
+        clienteId: cliente.id,
+        clienteEmail: cliente.email,
+        tiendaId: primerTiendaId,
+        tiendaNombre: nombreTienda(primerTiendaId),
+        estadoActual: 'completado',
+        fecha: DateTime.now().toIso8601String(),
+        subtotal: totalAmount,
+        total: totalAmount,
+        metodoPago: 'Tarjeta (Stripe)',
+      );
+
+      _items = [];
+      _pedidos.insert(0, pedido);
+      _isLoading = false;
+      notifyListeners();
+      return pedido;
+    } catch (e) {
+      _errorMessage = 'No se pudo confirmar el pedido: $e';
+      _isLoading = false;
+      notifyListeners();
+      return null;
+    }
+  }
+
   Future<void> loadPedidos({int? clienteId, int? tiendaId, int? propietarioId}) async {
     _isLoading = true;
     notifyListeners();
