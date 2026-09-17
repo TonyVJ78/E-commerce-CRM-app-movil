@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../core/constants/colors.dart';
 import '../../core/services/api_service.dart';
 import '../shared/custom_button.dart';
@@ -69,37 +70,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   SizedBox(width: 8),
                   Text(
                     'Conectividad con Backend Django',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: KantuColors.textPrimary),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: KantuColors.textPrimary,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               const Text(
                 'Puedes usar Kantu Market en modo 100% Autónomo (Base de Datos Local SQLite con datos semilla) o conectarlo al servidor Django REST en ejecución.',
-                style: TextStyle(fontSize: 13, color: KantuColors.textSecondary, height: 1.4),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: KantuColors.textSecondary,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 20),
 
               // Switch Online/Offline
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: KantuColors.background,
+              Material(
+                color: KantuColors.background,
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: KantuColors.border),
+                  side: const BorderSide(color: KantuColors.border),
                 ),
-                child: SwitchListTile(
-                  title: const Text(
-                    'Conectar con Django REST API',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
                   ),
-                  subtitle: Text(
-                    _useOnline ? 'Modo Servidor Remoto Activo' : 'Modo Autónomo Local (SQLite)',
-                    style: const TextStyle(fontSize: 12, color: KantuColors.textSecondary),
+                  child: SwitchListTile(
+                    title: const Text(
+                      'Conectar con Django REST API',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    subtitle: Text(
+                      _useOnline
+                          ? 'Modo Servidor Remoto Activo'
+                          : 'Modo Autónomo Local (SQLite)',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: KantuColors.textSecondary,
+                      ),
+                    ),
+                    value: _useOnline,
+                    activeThumbColor: KantuColors.primary,
+                    onChanged: (val) => setState(() => _useOnline = val),
                   ),
-                  value: _useOnline,
-                  activeThumbColor: KantuColors.primary,
-                  onChanged: (val) => setState(() => _useOnline = val),
                 ),
               ),
               const SizedBox(height: 20),
@@ -108,7 +131,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 label: 'URL Base del Backend API',
                 hint: 'http://10.0.2.2:8000/api o IP de tu PC',
                 controller: _urlController,
-                prefixIcon: const Icon(Icons.link, size: 20, color: KantuColors.textMuted),
+                prefixIcon: const Icon(
+                  Icons.link,
+                  size: 20,
+                  color: KantuColors.textMuted,
+                ),
               ),
               const SizedBox(height: 8),
               const Text(
@@ -117,10 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-              CustomButton(
-                text: 'Guardar Cambios',
-                onPressed: _saveSettings,
-              ),
+              CustomButton(text: 'Guardar Cambios', onPressed: _saveSettings),
             ],
           ),
         ),

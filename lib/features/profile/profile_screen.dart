@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/colors.dart';
 import '../../core/services/api_service.dart';
 import '../../core/services/auth_service.dart';
@@ -19,12 +20,15 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
+
   bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
+
     final user = context.read<AuthService>().currentUser;
+
     if (user != null) {
       _firstNameController.text = user.firstName;
       _lastNameController.text = user.lastName;
@@ -40,6 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _handleSave() async {
     final authService = context.read<AuthService>();
+
     final success = await authService.updatePerfil(
       _firstNameController.text.trim(),
       _lastNameController.text.trim(),
@@ -47,6 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (success && mounted) {
       setState(() => _isEditing = false);
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Perfil actualizado exitosamente'),
@@ -60,12 +66,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cerrar Sesión', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text(
+          'Cerrar Sesión',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         content: const Text('¿Estás seguro de que deseas salir de tu cuenta?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar', style: TextStyle(color: KantuColors.textSecondary)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: KantuColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -75,14 +87,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
+
               final nav = Navigator.of(context);
+
               await authService.logout();
+
               nav.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (route) => false,
               );
             },
-            child: const Text('Salir', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: const Text(
+              'Salir',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -95,7 +113,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = authService.currentUser;
 
     if (user == null) {
-      return const Scaffold(body: Center(child: Text('No has iniciado sesión')));
+      return const Scaffold(
+        body: Center(child: Text('No has iniciado sesión')),
+      );
     }
 
     return Scaffold(
@@ -115,7 +135,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // User Avatar Card
+            // =========================================================
+            // TARJETA DEL USUARIO
+            // =========================================================
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -150,7 +172,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user.fullName.isNotEmpty ? user.fullName : 'Usuario Kantu',
+                          user.fullName.isNotEmpty
+                              ? user.fullName
+                              : 'Usuario Kantu',
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
@@ -160,17 +184,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(height: 4),
                         Text(
                           user.email,
-                          style: const TextStyle(fontSize: 13, color: KantuColors.textSecondary),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: KantuColors.textSecondary,
+                          ),
                         ),
                         const SizedBox(height: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: user.rol == 'administrador'
                                 ? KantuColors.primaryLight
                                 : user.rol == 'empresa'
-                                    ? KantuColors.accentLight
-                                    : KantuColors.successLight,
+                                ? KantuColors.accentLight
+                                : KantuColors.successLight,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -181,8 +211,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: user.rol == 'administrador'
                                   ? KantuColors.primary
                                   : user.rol == 'empresa'
-                                      ? KantuColors.accentDark
-                                      : KantuColors.success,
+                                  ? KantuColors.accentDark
+                                  : KantuColors.success,
                             ),
                           ),
                         ),
@@ -192,9 +222,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
+
             const SizedBox(height: 16),
 
-            // Form de Edición (CU04)
+            // =========================================================
+            // EDICIÓN DE PERFIL - CU04
+            // =========================================================
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -217,17 +250,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       const Text(
                         'Datos Personales',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: KantuColors.textPrimary),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: KantuColors.textPrimary,
+                        ),
                       ),
                       TextButton.icon(
-                        icon: Icon(_isEditing ? Icons.close : Icons.edit, size: 16),
+                        icon: Icon(
+                          _isEditing ? Icons.close : Icons.edit,
+                          size: 16,
+                        ),
                         label: Text(_isEditing ? 'Cancelar' : 'Editar'),
-                        style: TextButton.styleFrom(foregroundColor: KantuColors.primary),
+                        style: TextButton.styleFrom(
+                          foregroundColor: KantuColors.primary,
+                        ),
                         onPressed: () {
                           setState(() {
                             _isEditing = !_isEditing;
+
                             if (!_isEditing) {
                               _firstNameController.text = user.firstName;
+
                               _lastNameController.text = user.lastName;
                             }
                           });
@@ -235,6 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 12),
 
                   CustomTextField(
@@ -242,6 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     controller: _firstNameController,
                     readOnly: !_isEditing,
                   ),
+
                   const SizedBox(height: 12),
 
                   CustomTextField(
@@ -249,6 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     controller: _lastNameController,
                     readOnly: !_isEditing,
                   ),
+
                   const SizedBox(height: 12),
 
                   CustomTextField(
@@ -268,14 +315,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
+
             const SizedBox(height: 16),
 
-            // Conectividad con el backend (modo autónomo / servidor remoto)
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
+            // =========================================================
+            // CONFIGURACIÓN DEL SERVIDOR
+            //
+            // CORRECCIÓN:
+            // El ListTile ahora tiene Material propio.
+            // Esto evita:
+            //
+            // "ListTile background color or ink splashes may be invisible"
+            // =========================================================
+            Material(
+              color: Colors.white,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: KantuColors.border),
+                side: const BorderSide(color: KantuColors.border),
               ),
               child: ListTile(
                 leading: Container(
@@ -284,7 +341,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: KantuColors.info.withAlpha(20),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.settings_ethernet, color: KantuColors.info, size: 20),
+                  child: const Icon(
+                    Icons.settings_ethernet,
+                    color: KantuColors.info,
+                    size: 20,
+                  ),
                 ),
                 title: const Text(
                   'Configuración del Servidor',
@@ -294,27 +355,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ApiService.instance.useOnlineBackend
                       ? 'Modo servidor remoto · ${ApiService.instance.baseUrl}'
                       : 'Modo autónomo local (SQLite)',
-                  style: const TextStyle(fontSize: 12, color: KantuColors.textSecondary),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: KantuColors.textSecondary,
+                  ),
                 ),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: KantuColors.textMuted),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: KantuColors.textMuted,
+                ),
                 onTap: () async {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   );
-                  // El subtítulo depende del modo, que la pantalla pudo cambiar.
-                  if (mounted) setState(() {});
+
+                  // El subtítulo depende del modo,
+                  // que la pantalla pudo cambiar.
+                  if (mounted) {
+                    setState(() {});
+                  }
                 },
               ),
             ),
+
             const SizedBox(height: 16),
 
-            // Botón de Cerrar Sesión (CU03)
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
+            // =========================================================
+            // CERRAR SESIÓN - CU03
+            //
+            // CORRECCIÓN:
+            // También utiliza Material propio.
+            // =========================================================
+            Material(
+              color: Colors.white,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: KantuColors.border),
+                side: const BorderSide(color: KantuColors.border),
               ),
               child: ListTile(
                 leading: Container(
@@ -323,11 +402,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: KantuColors.error.withAlpha(20),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.logout, color: KantuColors.error, size: 20),
+                  child: const Icon(
+                    Icons.logout,
+                    color: KantuColors.error,
+                    size: 20,
+                  ),
                 ),
-                title: const Text('Cerrar Sesión', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: KantuColors.error)),
-                subtitle: const Text('Salir de la cuenta en este dispositivo', style: TextStyle(fontSize: 12, color: KantuColors.textSecondary)),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: KantuColors.textMuted),
+                title: const Text(
+                  'Cerrar Sesión',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: KantuColors.error,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Salir de la cuenta en este dispositivo',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: KantuColors.textSecondary,
+                  ),
+                ),
+                trailing: const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: KantuColors.textMuted,
+                ),
                 onTap: () => _showLogoutDialog(context, authService),
               ),
             ),
