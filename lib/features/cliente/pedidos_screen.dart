@@ -102,10 +102,16 @@ class _TarjetaPedido extends StatelessWidget {
         return KantuColors.error;
       case 'pendiente':
         return KantuColors.warning;
+      case 'procesado':
+      case 'enviado':
+        return KantuColors.info;
       default:
         return KantuColors.success;
     }
   }
+
+  String get _textoEstado =>
+      (pedido.estadoEtiqueta.isNotEmpty ? pedido.estadoEtiqueta : pedido.estadoActual).toUpperCase();
 
   String get _fechaCorta {
     final fecha = DateTime.tryParse(pedido.fecha);
@@ -145,7 +151,7 @@ class _TarjetaPedido extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  pedido.estadoActual.toUpperCase(),
+                  _textoEstado,
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _colorEstado),
                 ),
               ),
@@ -159,9 +165,17 @@ class _TarjetaPedido extends StatelessWidget {
             style: const TextStyle(fontSize: 13, color: KantuColors.textSecondary),
           ),
           Text(
-            '💳 ${pedido.metodoPago}${_fechaCorta.isNotEmpty ? "  ·  📅 $_fechaCorta" : ""}',
+            [
+              if (pedido.metodoPago.isNotEmpty) '💳 ${pedido.metodoPago}',
+              if (_fechaCorta.isNotEmpty) '📅 $_fechaCorta',
+            ].join('  ·  '),
             style: const TextStyle(fontSize: 13, color: KantuColors.textSecondary),
           ),
+          if (pedido.seguimiento.isNotEmpty)
+            Text(
+              '🚚 ${pedido.seguimiento}',
+              style: const TextStyle(fontSize: 13, color: KantuColors.textSecondary),
+            ),
           const Divider(height: 20),
           ...pedido.items.map(
             (it) => Padding(

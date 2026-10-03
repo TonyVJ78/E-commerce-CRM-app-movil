@@ -43,6 +43,13 @@ class Pedido {
   final String metodoPago;
   final List<ItemPedido> items;
 
+  /// Nombre legible del estado que arma el servidor (CU-22). Vacío en pedidos
+  /// locales, donde se muestra el valor de [estadoActual].
+  final String estadoEtiqueta;
+
+  /// Transportista y número de seguimiento cuando la empresa ya despachó el pedido.
+  final String seguimiento;
+
   Pedido({
     required this.id,
     required this.clienteId,
@@ -55,7 +62,49 @@ class Pedido {
     required this.total,
     this.metodoPago = 'QR Simple (Bolivia)',
     this.items = const [],
+    this.estadoEtiqueta = '',
+    this.seguimiento = '',
   });
+
+  /// Pedido tal como lo devuelven `GET /pedidos/mis-pedidos/` (cliente) y
+  /// `GET /tiendas/<id>/pedidos/` (empresa, que no trae ítems ni envío).
+  factory Pedido.fromApi(Map<String, dynamic> json, {int clienteId = 0, String tiendaNombre = ''}) {
+    final cliente = json['cliente'];
+    final envio = json['envio'];
+    final partesEnvio = <String>[
+      if (envio is Map && (envio['transportista']?.toString() ?? '').isNotEmpty)
+        envio['transportista'].toString(),
+      if (envio is Map && (envio['numero_seguimiento']?.toString() ?? '').isNotEmpty)
+        'N.º ${envio['numero_seguimiento']}',
+    ];
+    final total = double.tryParse(json['total']?.toString() ?? '0') ?? 0.0;
+    final id = int.tryParse(json['id']?.toString() ?? '') ?? 0;
+    final estado = json['estado']?.toString() ?? 'pendiente';
+
+    return Pedido(
+      id: id,
+      clienteId: clienteId,
+      clienteEmail: cliente is Map ? cliente['email']?.toString() ?? '' : '',
+      tiendaId: 0,
+      tiendaNombre: json['tienda_nombre']?.toString() ?? tiendaNombre,
+      estadoActual: estado,
+      estadoEtiqueta: json['estado_etiqueta']?.toString() ?? '',
+      fecha: json['fecha']?.toString() ?? '',
+      subtotal: total,
+      total: total,
+      // El servidor puede no informar el método (listado de la empresa): vacío
+      // para que la tarjeta no muestre uno inventado.
+      metodoPago: json['metodo_pago']?.toString() ?? '',
+      seguimiento: partesEnvio.join(' · '),
+      items: [
+        for (final it in (json['items'] as List? ?? const []))
+          ItemPedido.fromMap({
+            ...Map<String, dynamic>.from(it as Map),
+            'pedido_id': id,
+          }),
+      ],
+    );
+  }
 
   factory Pedido.fromMap(Map<String, dynamic> map, {List<ItemPedido> items = const []}) {
     return Pedido(

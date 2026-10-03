@@ -56,4 +56,6 @@ class ApiConstants {
   static String carritoItemDetalle(int itemId) => '/pedidos/carrito/items/$itemId/';
   static const String carritoCheckout = '/pedidos/carrito/checkout/';
   static const String carritoPagoIntento = '/pedidos/carrito/pago-intento/';
+  static const String misPedidos = '/pedidos/mis-pedidos/';
+  static String pedidosTienda(int tiendaId) => '/tiendas/$tiendaId/pedidos/';
 }

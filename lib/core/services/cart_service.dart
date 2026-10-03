@@ -447,7 +447,7 @@ class CartService extends ChangeNotifier {
         clienteEmail: cliente.email,
         tiendaId: primerTiendaId,
         tiendaNombre: nombreTienda(primerTiendaId),
-        estadoActual: 'completado',
+        estadoActual: 'pendiente',
         fecha: DateTime.now().toIso8601String(),
         subtotal: totalAmount,
         total: totalAmount,
@@ -469,13 +469,20 @@ class CartService extends ChangeNotifier {
 
   Future<void> loadPedidos({int? clienteId, int? tiendaId, int? propietarioId}) async {
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
     try {
-      _pedidos = await DatabaseHelper.instance.getPedidos(
-        clienteId: clienteId,
-        tiendaId: tiendaId,
-        propietarioId: propietarioId,
-      );
+      if (_online) {
+        // En modo servidor el estado de cada pedido lo maneja la empresa (CU-22),
+        // así que la fuente de verdad es el backend, sin respaldo local.
+        _pedidos = await _loadPedidosRemoto(clienteId: clienteId, propietarioId: propietarioId);
+      } else {
+        _pedidos = await DatabaseHelper.instance.getPedidos(
+          clienteId: clienteId,
+          tiendaId: tiendaId,
+          propietarioId: propietarioId,
+        );
+      }
     } catch (e) {
       _errorMessage = 'No se pudieron cargar los pedidos: $e';
     }
@@ -483,11 +490,47 @@ class CartService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Cliente: `GET /pedidos/mis-pedidos/`. Empresa: los pedidos recibidos de
+  /// cada una de sus tiendas (`GET /tiendas/<id>/pedidos/`), del más nuevo al más antiguo.
+  Future<List<Pedido>> _loadPedidosRemoto({int? clienteId, int? propietarioId}) async {
+    if (clienteId != null) {
+      final res = await ApiService.instance.get(ApiConstants.misPedidos, auth: true);
+      if (res.statusCode != 200) throw Exception(_mensajeError(res.body));
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return [
+        for (final p in (data['pedidos'] as List? ?? const []))
+          Pedido.fromApi(Map<String, dynamic>.from(p as Map), clienteId: clienteId),
+      ];
+    }
+
+    final resTiendas = await ApiService.instance.get(ApiConstants.tiendas, auth: true);
+    if (resTiendas.statusCode != 200) throw Exception(_mensajeError(resTiendas.body));
+    final decodificado = jsonDecode(resTiendas.body);
+    final tiendas = decodificado is Map ? (decodificado['results'] as List? ?? const []) : decodificado as List;
+
+    final pedidos = <Pedido>[];
+    for (final tienda in tiendas) {
+      final tiendaId = _entero((tienda as Map)['id']);
+      final res = await ApiService.instance.get(ApiConstants.pedidosTienda(tiendaId), auth: true);
+      if (res.statusCode != 200) throw Exception(_mensajeError(res.body));
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final nombre = (data['tienda'] as Map?)?['nombre']?.toString() ?? '';
+      for (final p in (data['pedidos'] as List? ?? const [])) {
+        pedidos.add(Pedido.fromApi(Map<String, dynamic>.from(p as Map), tiendaNombre: nombre));
+      }
+    }
+    pedidos.sort((a, b) => b.fecha.compareTo(a.fecha));
+    return pedidos;
+  }
+
   static String _mensajeError(String body) {
     try {
       final data = jsonDecode(body);
       if (data is Map) {
         if (data['detail'] != null) return data['detail'].toString();
+        // Los endpoints de pedidos devuelven {"error": "..."} (a veces con
+        // banderas extra como "reembolsado" que no son mensajes).
+        if (data['error'] != null) return data['error'].toString();
         final partes = <String>[];
         data.forEach((campo, valor) {
           partes.add(valor is List ? valor.join(' ') : valor.toString());
