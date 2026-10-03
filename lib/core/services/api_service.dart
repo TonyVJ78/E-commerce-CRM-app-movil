@@ -152,11 +152,18 @@ class ApiService {
     );
   }
 
-  Future<http.Response> post(String endpoint, Map<String, dynamic> body, {bool auth = false}) {
+  /// `timeout` permite esperar más que el valor general a las peticiones
+  /// lentas a propósito, como el chatbot, que consulta un modelo de IA.
+  Future<http.Response> post(
+    String endpoint,
+    Map<String, dynamic> body, {
+    bool auth = false,
+    Duration? timeout,
+  }) {
     return _enviar(
       () async => http
           .post(_uri(endpoint), headers: await _headers(auth: auth), body: jsonEncode(body))
-          .timeout(_timeout),
+          .timeout(timeout ?? _timeout),
       auth: auth,
     );
   }

@@ -58,4 +58,7 @@ class ApiConstants {
   static const String carritoPagoIntento = '/pedidos/carrito/pago-intento/';
   static const String misPedidos = '/pedidos/mis-pedidos/';
   static String pedidosTienda(int tiendaId) => '/tiendas/$tiendaId/pedidos/';
+
+  // --- Chatbot de recomendaciones (Claude) ---
+  static const String chatbot = '/ia/chatbot/';
 }

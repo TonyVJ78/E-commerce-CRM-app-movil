@@ -5,6 +5,7 @@ import 'core/services/api_service.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/cart_service.dart';
 import 'core/services/catalogo_service.dart';
+import 'core/services/chatbot_service.dart';
 import 'core/services/dashboard_service.dart';
 import 'core/services/tienda_service.dart';
 import 'features/auth/login_screen.dart';
@@ -25,6 +26,7 @@ void main() async {
         ChangeNotifierProvider<CatalogoService>(create: (_) => CatalogoService()),
         ChangeNotifierProvider<CartService>(create: (_) => CartService()),
         ChangeNotifierProvider<DashboardService>(create: (_) => DashboardService()),
+        ChangeNotifierProvider<ChatbotService>(create: (_) => ChatbotService()),
       ],
       child: const KantuMarketApp(),
     ),
