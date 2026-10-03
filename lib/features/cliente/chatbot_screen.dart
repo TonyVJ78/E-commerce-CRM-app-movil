@@ -70,9 +70,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     );
   }
 
+  /// El asistente solo enlaza productos (`producto:ID`); cualquier otro
+  /// enlace se ignora.
   void _alTocarEnlace(String? href) {
-    final id = int.tryParse((href ?? '').replaceFirst('producto:', ''));
-    if (href == null || !href.startsWith('producto:') || id == null) return;
+    if (href == null || !href.startsWith('producto:')) return;
+    final id = int.tryParse(href.substring('producto:'.length));
+    if (id == null) return;
     final producto = context.read<ChatbotService>().productoCitado(id);
     if (producto != null) {
       _abrirProducto(producto);
