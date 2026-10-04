@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/colors.dart';
 import '../../core/models/pedido.dart';
 import '../../core/services/pedidos_service.dart';
 
+/// Modal BottomSheet para la trazabilidad y seguimiento en tiempo real del pedido (CU-20)
+/// y el registro de calificaciones con estrellas táctiles nativas (CU-21).
 class SeguimientoPedidoSheet extends StatefulWidget {
   const SeguimientoPedidoSheet({super.key, required this.pedido});
 
@@ -16,11 +19,12 @@ class SeguimientoPedidoSheet extends StatefulWidget {
 class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
   final _service = PedidosService();
   final _comentarioController = TextEditingController();
+
   Map<String, dynamic>? _detalle;
   List<Map<String, dynamic>> _resenas = [];
   bool _cargando = true;
   bool _guardando = false;
-  String _tipo = 'producto';
+  String _tipo = 'producto'; // 'producto' | 'tienda'
   int? _productoId;
   int _calificacion = 5;
   String? _error;
@@ -43,9 +47,11 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
       _cargando = true;
       _error = null;
     });
+
     try {
       final detalle = await _service.obtenerDetalle(widget.pedido.id);
       if (!mounted) return;
+
       final productos = _productos(detalle);
       setState(() {
         _detalle = detalle;
@@ -58,24 +64,60 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _error = _textoError(error);
-        _cargando = false;
-      });
+
+      // Resiliencia ante errores HTTP 404 o caídas de red:
+      // Si la carga inicial falla, cerramos el bottomsheet de forma segura y regresamos
+      // a la lista principal desplegando un SnackBar descriptivo sin provocar crashes.
+      Navigator.of(context).pop();
+
+      final is404 = error is PedidoNotFoundException ||
+          error is HttpException ||
+          error.toString().contains('404') ||
+          error.toString().toLowerCase().contains('no encontrado');
+
+      final mensaje = is404
+          ? 'El pedido #${widget.pedido.id} no fue encontrado o no tienes permiso para verlo.'
+          : 'Error de conexión al consultar el pedido #${widget.pedido.id}. Revisa tu conexión.';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                is404 ? Icons.search_off_rounded : Icons.wifi_off_rounded,
+                color: Colors.white,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  mensaje,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: KantuColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
   Future<void> _guardar() async {
     if (_guardando) return;
     if (_tipo == 'producto' && _productoId == null) {
-      setState(() => _error = 'Elige un producto de este pedido.');
+      setState(() => _error = 'Selecciona el producto a calificar.');
       return;
     }
+
     setState(() {
       _guardando = true;
       _error = null;
       _mensaje = null;
     });
+
     try {
       await _service.guardarResena(
         widget.pedido.id,
@@ -84,23 +126,50 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
         calificacion: _calificacion,
         comentario: _comentarioController.text.trim(),
       );
+
       _comentarioController.clear();
-      await _cargar();
+      await _cargarSilencioso();
+
       if (mounted) {
         setState(() {
           _guardando = false;
-          _mensaje = 'La calificación quedó registrada.';
+          _mensaje = '¡Tu calificación fue registrada exitosamente!';
         });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white),
+                SizedBox(width: 12),
+                Text('¡Calificación guardada correctamente!'),
+              ],
+            ),
+            backgroundColor: KantuColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
       }
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _guardando = false;
         _error = _textoError(error);
       });
     }
+  }
+
+  Future<void> _cargarSilencioso() async {
+    try {
+      final detalle = await _service.obtenerDetalle(widget.pedido.id);
+      if (!mounted) return;
+      setState(() {
+        _detalle = detalle;
+        _resenas = (detalle['resenas'] as List? ?? const [])
+            .cast<Map<String, dynamic>>();
+      });
+    } catch (_) {}
   }
 
   List<Map<String, dynamic>> _productos(Map<String, dynamic> detalle) {
@@ -134,6 +203,49 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
     }.contains(estado);
   }
 
+  Color _colorPorEstado(String estado) {
+    switch (estado.toLowerCase()) {
+      case 'completado':
+      case 'completada':
+      case 'entregado':
+      case 'finalizado':
+        return KantuColors.success;
+      case 'en_camino':
+      case 'enviado':
+      case 'en_proceso':
+        return KantuColors.info;
+      case 'pagado':
+        return const Color(0xFF0D9488);
+      case 'cancelado':
+        return KantuColors.error;
+      case 'pendiente':
+      default:
+        return KantuColors.warning;
+    }
+  }
+
+  IconData _iconoPorEstado(String estado) {
+    switch (estado.toLowerCase()) {
+      case 'completado':
+      case 'completada':
+      case 'entregado':
+      case 'finalizado':
+        return Icons.check_circle_rounded;
+      case 'en_camino':
+      case 'enviado':
+        return Icons.local_shipping_rounded;
+      case 'en_proceso':
+        return Icons.inventory_2_rounded;
+      case 'pagado':
+        return Icons.paid_rounded;
+      case 'cancelado':
+        return Icons.cancel_rounded;
+      case 'pendiente':
+      default:
+        return Icons.pending_actions_rounded;
+    }
+  }
+
   String _fecha(dynamic raw) {
     final fecha = DateTime.tryParse(raw?.toString() ?? '')?.toLocal();
     if (fecha == null) return 'Fecha no disponible';
@@ -147,27 +259,30 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(bottom: bottomInset),
-        child: DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: .82,
-          minChildSize: .5,
-          maxChildSize: .96,
-          builder: (context, scrollController) => Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: _cargando && _detalle == null
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: KantuColors.primary,
-                    ),
-                  )
-                : _contenido(scrollController),
-          ),
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: _cargando
+              ? const SizedBox(
+                  height: 320,
+                  child: Center(
+                    child: CircularProgressIndicator(color: KantuColors.primary),
+                  ),
+                )
+              : DraggableScrollableSheet(
+                  initialChildSize: 0.85,
+                  minChildSize: 0.5,
+                  maxChildSize: 0.95,
+                  expand: false,
+                  builder: (context, scrollController) => _contenido(scrollController),
+                ),
         ),
       ),
     );
@@ -175,6 +290,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
 
   Widget _contenido(ScrollController scrollController) {
     final detalle = _detalle;
+    final estadoActual = (detalle?['estado'] ?? widget.pedido.estadoActual).toString();
     final items = detalle == null
         ? <Map<String, dynamic>>[]
         : (detalle['items'] as List? ?? const []).cast<Map<String, dynamic>>();
@@ -188,179 +304,544 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
 
     return ListView(
       controller: scrollController,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
       children: [
+        // Grab handle bar
         Center(
           child: Container(
-            width: 36,
-            height: 4,
+            width: 44,
+            height: 5,
             decoration: BoxDecoration(
               color: KantuColors.border,
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(3),
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
+
+        // Cabecera del pedido
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Text(
-                'Pedido #${widget.pedido.id}',
-                style: const TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w800,
-                  color: KantuColors.textPrimary,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pedido #${widget.pedido.id}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: KantuColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    (detalle?['tienda_nombre'] ?? widget.pedido.tiendaNombre).toString(),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: KantuColors.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Text(
-              (detalle?['estado'] ?? widget.pedido.estadoActual)
-                  .toString()
-                  .toUpperCase(),
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: KantuColors.primary,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: _colorPorEstado(estadoActual).withAlpha(30),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _colorPorEstado(estadoActual).withAlpha(80),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _iconoPorEstado(estadoActual),
+                    size: 15,
+                    color: _colorPorEstado(estadoActual),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    estadoActual.replaceAll('_', ' ').toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: _colorPorEstado(estadoActual),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          (detalle?['tienda_nombre'] ?? widget.pedido.tiendaNombre).toString(),
-          style: const TextStyle(color: KantuColors.textSecondary),
-        ),
+
         if (_error != null) _aviso(_error!, error: true),
         if (_mensaje != null) _aviso(_mensaje!),
-        const SizedBox(height: 16),
+
+        const SizedBox(height: 20),
+
+        // Resumen financiero
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: KantuColors.background,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: KantuColors.border),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Total del Pedido',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: KantuColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Bs. ${detalle?['total'] ?? widget.pedido.total.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: KantuColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    'Método de Pago',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: KantuColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    (detalle?['metodo_pago'] ?? widget.pedido.metodoPago).toString(),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: KantuColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 22),
+
+        // Lista de Ítems
         const Text(
-          'Productos',
+          'Productos Adquiridos',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
-        ...items.map(
-          (item) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(item['producto_nombre']?.toString() ?? 'Producto'),
-            subtitle: Text(
-              '${item['variante_nombre'] ?? ''} · ${item['cantidad'] ?? 0} unidad(es)',
+        const SizedBox(height: 8),
+        ...items.map((item) => Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: KantuColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: KantuColors.primaryLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Center(
+                  child: Icon(Icons.shopping_bag_outlined, color: KantuColors.primary, size: 20),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item['producto_nombre']?.toString() ?? 'Producto',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    ),
+                    Text(
+                      '${item['variante_nombre'] ?? ''} · ${item['cantidad'] ?? 0} unid.',
+                      style: const TextStyle(color: KantuColors.textSecondary, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                'Bs. ${item['subtotal'] ?? '0.00'}',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+            ],
+          ),
+        )),
+
+        const SizedBox(height: 22),
+
+        // Timeline de Seguimiento de Estados (CU-20)
+        const Row(
+          children: [
+            Icon(Icons.timeline_rounded, color: KantuColors.primary, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Línea de Tiempo de Seguimiento',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
-            trailing: Text('Bs. ${item['subtotal'] ?? '0.00'}'),
-          ),
+          ],
         ),
-        const Divider(height: 24),
-        const Text(
-          'Historial de estados',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-        ),
+        const SizedBox(height: 12),
         if (historial.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('Aún no hay cambios de estado registrados.'),
-          ),
-        ...historial.map(_evento),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: KantuColors.background,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'No hay registros históricos para este pedido aún.',
+              style: TextStyle(color: KantuColors.textSecondary),
+            ),
+          )
+        else
+          ...List.generate(historial.length, (index) {
+            final evento = historial[index];
+            final esUltimo = index == historial.length - 1;
+            return _timelineItem(evento, esUltimo: esUltimo);
+          }),
+
+        // Sección de Reseñas y Calificación Táctil (CU-21)
+        const SizedBox(height: 28),
+        const Divider(height: 1),
+        const SizedBox(height: 20),
+
         if (_calificable) ...[
-          const Divider(height: 28),
-          const Text(
-            'Califica tu compra',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          const Row(
+            children: [
+              Icon(Icons.star_rounded, color: KantuColors.warning, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Califica tu Compra',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+            ],
           ),
+          const SizedBox(height: 4),
+          const Text(
+            'Comparte tu opinión sobre el producto y la tienda para ayudar a la comunidad.',
+            style: TextStyle(fontSize: 12, color: KantuColors.textSecondary),
+          ),
+          const SizedBox(height: 14),
+
+          // Selector de Tipo de Reseña (Producto vs Tienda)
+          Row(
+            children: [
+              Expanded(
+                child: ChoiceChip(
+                  label: const Center(child: Text('🏷️ Producto')),
+                  selected: _tipo == 'producto',
+                  selectedColor: KantuColors.primaryLight,
+                  onSelected: (val) => setState(() => _tipo = 'producto'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ChoiceChip(
+                  label: const Center(child: Text('🏬 Tienda')),
+                  selected: _tipo == 'tienda',
+                  selectedColor: KantuColors.primaryLight,
+                  onSelected: (val) => setState(() => _tipo = 'tienda'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Selector de Producto si aplica
+          if (_tipo == 'producto') ...[
+            DropdownButtonFormField<int>(
+              initialValue: productos.any(
+                (item) => _entero(item['producto_id']) == _productoId,
+              )
+                  ? _productoId
+                  : null,
+              decoration: InputDecoration(
+                labelText: 'Producto a calificar',
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              items: productos.map(
+                (item) => DropdownMenuItem<int>(
+                  value: _entero(item['producto_id']),
+                  child: Text(
+                    item['producto_nombre']?.toString() ?? 'Producto',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ).toList(),
+              onChanged: (value) => setState(() => _productoId = value),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Componente Nativo Táctil de 5 Estrellas
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              color: KantuColors.background,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: KantuColors.border),
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  'Tu Puntuación',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                _selectorEstrellasTactil(),
+                const SizedBox(height: 4),
+                Text(
+                  _descripcionEstrellas(_calificacion),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: KantuColors.warning,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Campo de Comentario
+          TextField(
+            controller: _comentarioController,
+            maxLength: 500,
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'Cuéntanos tu experiencia (opcional)',
+              alignLabelWithHint: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.all(14),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Botón Guardar
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: KantuColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _guardando ? null : _guardar,
+              icon: _guardando
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.rate_review_rounded),
+              label: Text(_guardando ? 'Guardando reseña...' : 'Publicar Calificación'),
+            ),
+          ),
+
+          // Reseñas existentes
           if (_resenas.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const Text(
+              'Reseñas registradas en este pedido:',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
             ..._resenas.map(_resenaCard),
           ],
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: _tipo,
-            decoration: const InputDecoration(
-              labelText: 'Qué deseas calificar',
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: 'producto',
-                child: Text('Producto adquirido'),
-              ),
-              DropdownMenuItem(value: 'tienda', child: Text('Tienda')),
-            ],
-            onChanged: (value) => setState(() => _tipo = value ?? 'producto'),
-          ),
-          if (_tipo == 'producto')
-            DropdownButtonFormField<int>(
-              initialValue:
-                  productos.any(
-                    (item) => _entero(item['producto_id']) == _productoId,
-                  )
-                  ? _productoId
-                  : null,
-              decoration: const InputDecoration(labelText: 'Producto'),
-              items: productos
-                  .map(
-                    (item) => DropdownMenuItem<int>(
-                      value: _entero(item['producto_id']),
-                      child: Text(
-                        item['producto_nombre']?.toString() ?? 'Producto',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _productoId = value),
-            ),
-          DropdownButtonFormField<int>(
-            initialValue: _calificacion,
-            decoration: const InputDecoration(labelText: 'Puntuación'),
-            items: List.generate(5, (index) {
-              final puntos = 5 - index;
-              return DropdownMenuItem(
-                value: puntos,
-                child: Text('$puntos de 5 estrellas'),
-              );
-            }),
-            onChanged: (value) => setState(() => _calificacion = value ?? 5),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _comentarioController,
-            maxLength: 5000,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              labelText: 'Comentario',
-              alignLabelWithHint: true,
-              border: OutlineInputBorder(),
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: _guardando ? null : _guardar,
-            icon: const Icon(Icons.rate_review_outlined),
-            label: Text(_guardando ? 'Guardando...' : 'Guardar calificación'),
-          ),
         ] else ...[
-          const Divider(height: 28),
-          const Text(
-            'Las reseñas están disponibles cuando el pedido se completa o entrega.',
-            style: TextStyle(color: KantuColors.textSecondary),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: KantuColors.background,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: KantuColors.border),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded, color: KantuColors.textSecondary),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Las calificaciones y reseñas estarán disponibles cuando tu pedido haya sido completado o entregado.',
+                    style: TextStyle(fontSize: 13, color: KantuColors.textSecondary),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ],
     );
   }
 
-  Widget _evento(Map<String, dynamic> evento) {
+  Widget _selectorEstrellasTactil() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(5, (index) {
+        final estrellaNum = index + 1;
+        final activa = estrellaNum <= _calificacion;
+        return InkWell(
+          onTap: () => setState(() => _calificacion = estrellaNum),
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: AnimatedScale(
+              scale: activa ? 1.15 : 1.0,
+              duration: const Duration(milliseconds: 150),
+              child: Icon(
+                activa ? Icons.star_rounded : Icons.star_outline_rounded,
+                color: activa ? KantuColors.warning : KantuColors.border,
+                size: 38,
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  String _descripcionEstrellas(int calificacion) {
+    switch (calificacion) {
+      case 5:
+        return '5 / 5 — ¡Excelente experiencia!';
+      case 4:
+        return '4 / 5 — Muy bueno';
+      case 3:
+        return '3 / 5 — Regular / Aceptable';
+      case 2:
+        return '2 / 5 — Mejorable';
+      case 1:
+      default:
+        return '1 / 5 — Mala experiencia';
+    }
+  }
+
+  Widget _timelineItem(Map<String, dynamic> evento, {required bool esUltimo}) {
+    final estado = evento['estado']?.toString() ?? '';
+    final color = _colorPorEstado(estado);
     final observacion = evento['observacion']?.toString() ?? '';
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: const Icon(
-        Icons.radio_button_checked,
-        size: 18,
-        color: KantuColors.primary,
-      ),
-      title: Text(
-        evento['estado']?.toString().replaceAll('_', ' ').toUpperCase() ?? '',
-      ),
-      subtitle: Text(
-        [
-          _fecha(evento['fecha']),
-          if (observacion.isNotEmpty) observacion,
-        ].join('\n'),
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Columna de nodos y línea vertical conectora
+          Column(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: color.withAlpha(30),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: color, width: 2),
+                ),
+                child: Center(
+                  child: Icon(_iconoPorEstado(estado), size: 14, color: color),
+                ),
+              ),
+              if (!esUltimo)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    color: KantuColors.border,
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 14),
+
+          // Contenido del evento
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: esUltimo ? 0 : 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    estado.replaceAll('_', ' ').toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _fecha(evento['fecha']),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: KantuColors.textSecondary,
+                    ),
+                  ),
+                  if (observacion.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: KantuColors.background,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: KantuColors.border),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            size: 14,
+                            color: KantuColors.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              observacion,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: KantuColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -372,25 +853,46 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
         : resena['producto_nombre'];
     final calificacion = _entero(resena['calificacion']).clamp(0, 5);
     final comentario = resena['comentario']?.toString() ?? '';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: KantuColors.background,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: KantuColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            esTienda ? 'Tienda · $nombre' : 'Producto · $nombre',
-            style: const TextStyle(fontWeight: FontWeight.w700),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  esTienda ? '🏬 Tienda · $nombre' : '🏷️ Producto · $nombre',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Row(
+                children: List.generate(5, (index) {
+                  return Icon(
+                    index < calificacion ? Icons.star_rounded : Icons.star_outline_rounded,
+                    size: 16,
+                    color: KantuColors.warning,
+                  );
+                }),
+              ),
+            ],
           ),
-          Text(
-            '${'★' * calificacion}${'☆' * (5 - calificacion)}',
-            style: const TextStyle(color: KantuColors.warning, fontSize: 18),
-          ),
-          if (comentario.isNotEmpty) Text(comentario),
+          if (comentario.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              comentario,
+              style: const TextStyle(fontSize: 13, color: KantuColors.textPrimary),
+            ),
+          ],
         ],
       ),
     );
@@ -398,14 +900,33 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
 
   Widget _aviso(String mensaje, {bool error = false}) => Container(
     margin: const EdgeInsets.only(top: 12),
-    padding: const EdgeInsets.all(10),
+    padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: error ? const Color(0xFFFFEEEE) : const Color(0xFFE9F5EF),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(
+        color: error ? KantuColors.error.withAlpha(60) : KantuColors.success.withAlpha(60),
+      ),
     ),
-    child: Text(
-      mensaje,
-      style: TextStyle(color: error ? KantuColors.error : KantuColors.success),
+    child: Row(
+      children: [
+        Icon(
+          error ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+          size: 18,
+          color: error ? KantuColors.error : KantuColors.success,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            mensaje,
+            style: TextStyle(
+              color: error ? KantuColors.error : KantuColors.success,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     ),
   );
 }

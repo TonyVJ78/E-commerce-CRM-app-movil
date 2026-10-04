@@ -12,6 +12,7 @@ import 'seguimiento_pedido_sheet.dart';
 ///
 /// La misma pantalla sirve al cliente (sus compras) y a la empresa (las
 /// ventas de todas sus tiendas), cambiando sólo el filtro.
+/// Implementa reactividad en tiempo real con Provider (CU-20 y CU-21).
 class PedidosScreen extends StatefulWidget {
   final bool modoEmpresa;
 
@@ -28,13 +29,38 @@ class _PedidosScreenState extends State<PedidosScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _cargar());
   }
 
-  Future<void> _cargar() {
-    final auth = context.read<AuthService>();
-    final usuarioId = auth.currentUser?.id;
-    return context.read<CartService>().loadPedidos(
-      clienteId: widget.modoEmpresa ? null : usuarioId,
-      propietarioId: widget.modoEmpresa ? usuarioId : null,
-    );
+  Future<void> _cargar() async {
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final cart = Provider.of<CartService>(context, listen: false);
+    final user = auth.currentUser;
+    if (user == null) return;
+
+    if (widget.modoEmpresa) {
+      await cart.loadPedidos(propietarioId: user.id);
+    } else {
+      await cart.loadPedidos(clienteId: user.id);
+    }
+  }
+
+  Future<void> _abrirSeguimiento(Pedido pedido) async {
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => SeguimientoPedidoSheet(pedido: pedido),
+      );
+      if (!mounted) return;
+      await _cargar();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo abrir el detalle del pedido: $e'),
+          backgroundColor: KantuColors.error,
+        ),
+      );
+    }
   }
 
   @override
@@ -44,7 +70,7 @@ class _PedidosScreenState extends State<PedidosScreen> {
     return Scaffold(
       backgroundColor: KantuColors.background,
       appBar: KantuAppBar(
-        title: widget.modoEmpresa ? 'Ventas de mis Tiendas' : 'Mis Pedidos',
+        title: widget.modoEmpresa ? 'Ventas Recibidas' : 'Mis Pedidos',
         showBackButton: false,
       ),
       body: RefreshIndicator(
@@ -55,83 +81,81 @@ class _PedidosScreenState extends State<PedidosScreen> {
                 child: CircularProgressIndicator(color: KantuColors.primary),
               )
             : cartService.pedidos.isEmpty
-            ? ListView(
-                children: [
-                  if (cartService.errorMessage != null) ...[
-                    SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-                    const Center(
-                      child: Icon(
-                        Icons.cloud_off_outlined,
-                        size: 56,
-                        color: KantuColors.error,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        cartService.errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: KantuColors.error),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: _cargar,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Reintentar'),
-                    ),
-                  ] else ...[
-                    SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-                    const Center(
-                      child: Text('📦', style: TextStyle(fontSize: 64)),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      widget.modoEmpresa
-                          ? 'Aún no tienes ventas'
-                          : 'Aún no tienes pedidos',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: KantuColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.modoEmpresa
-                          ? 'Los pedidos que reciban tus tiendas aparecerán aquí.'
-                          : 'Tus compras realizadas aparecerán listadas aquí.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: KantuColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ],
-              )
-            : ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: cartService.pedidos.length,
-                separatorBuilder: (_, index) => const SizedBox(height: 12),
-                itemBuilder: (ctx, idx) {
-                  final pedido = cartService.pedidos[idx];
-                  return _TarjetaPedido(
-                    pedido: pedido,
-                    modoEmpresa: widget.modoEmpresa,
-                    onTap: widget.modoEmpresa
-                        ? null
-                        : () => showModalBottomSheet<void>(
-                            context: ctx,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (_) =>
-                                SeguimientoPedidoSheet(pedido: pedido),
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      if (cartService.errorMessage != null) ...[
+                        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                        const Center(
+                          child: Icon(
+                            Icons.cloud_off_outlined,
+                            size: 56,
+                            color: KantuColors.error,
                           ),
-                  );
-                },
-              ),
+                        ),
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Text(
+                            cartService.errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: KantuColors.error),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: TextButton.icon(
+                            onPressed: _cargar,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Reintentar'),
+                          ),
+                        ),
+                      ] else ...[
+                        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                        const Center(
+                          child: Text('📦', style: TextStyle(fontSize: 64)),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          widget.modoEmpresa
+                              ? 'Aún no tienes ventas'
+                              : 'Aún no tienes pedidos',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: KantuColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          widget.modoEmpresa
+                              ? 'Los pedidos que reciban tus tiendas aparecerán aquí.'
+                              : 'Tus compras realizadas aparecerán listadas aquí.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: KantuColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: cartService.pedidos.length,
+                    separatorBuilder: (_, index) => const SizedBox(height: 12),
+                    itemBuilder: (ctx, idx) {
+                      final pedido = cartService.pedidos[idx];
+                      return _TarjetaPedido(
+                        pedido: pedido,
+                        modoEmpresa: widget.modoEmpresa,
+                        onTap: widget.modoEmpresa
+                            ? null
+                            : () => _abrirSeguimiento(pedido),
+                      );
+                    },
+                  ),
       ),
     );
   }
@@ -149,11 +173,19 @@ class _TarjetaPedido extends StatelessWidget {
   });
 
   Color get _colorEstado {
-    switch (pedido.estadoActual) {
+    switch (pedido.estadoActual.toLowerCase()) {
       case 'cancelado':
         return KantuColors.error;
       case 'pendiente':
         return KantuColors.warning;
+      case 'en_camino':
+      case 'enviado':
+      case 'en_proceso':
+        return KantuColors.info;
+      case 'completado':
+      case 'completada':
+      case 'entregado':
+      case 'finalizado':
       default:
         return KantuColors.success;
     }
@@ -203,7 +235,7 @@ class _TarjetaPedido extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    pedido.estadoActual.toUpperCase(),
+                    pedido.estadoActual.replaceAll('_', ' ').toUpperCase(),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -271,6 +303,22 @@ class _TarjetaPedido extends StatelessWidget {
                 ),
               ],
             ),
+            if (!modoEmpresa) ...[
+              const SizedBox(height: 12),
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    'Ver seguimiento y reseñas →',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: KantuColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
