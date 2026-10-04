@@ -37,8 +37,10 @@ class ApiConstants {
   static const String dashboardVendedor = '/tiendas/dashboard/';
 
   // --- Catálogo de la empresa (CU-08 y CU-09) ---
-  static String categoriasTienda(int tiendaId) => '/tiendas/$tiendaId/categorias/';
-  static String productosTienda(int tiendaId) => '/tiendas/$tiendaId/productos/';
+  static String categoriasTienda(int tiendaId) =>
+      '/tiendas/$tiendaId/categorias/';
+  static String productosTienda(int tiendaId) =>
+      '/tiendas/$tiendaId/productos/';
   static String productoDetalle(int tiendaId, int productoId) =>
       '/tiendas/$tiendaId/productos/$productoId/';
 
@@ -53,7 +55,13 @@ class ApiConstants {
   // --- Carrito (CU-11) y checkout con pasarela de pagos (CU-19) ---
   static const String carrito = '/pedidos/carrito/';
   static const String carritoItems = '/pedidos/carrito/items/';
-  static String carritoItemDetalle(int itemId) => '/pedidos/carrito/items/$itemId/';
+  static String carritoItemDetalle(int itemId) =>
+      '/pedidos/carrito/items/$itemId/';
   static const String carritoCheckout = '/pedidos/carrito/checkout/';
   static const String carritoPagoIntento = '/pedidos/carrito/pago-intento/';
+  static const String misPedidos = '/pedidos/mis-pedidos/';
+  static String pedidoCliente(int pedidoId) =>
+      '/pedidos/mis-pedidos/$pedidoId/';
+  static String resenasPedido(int pedidoId) =>
+      '/pedidos/mis-pedidos/$pedidoId/resenas/';
 }
