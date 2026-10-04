@@ -13,6 +13,9 @@ import '../shared/kantu_search_field.dart';
 import '../shared/producto_imagen.dart';
 import '../../core/services/recommendation_service.dart';
 import 'producto_detail_sheet.dart';
+import '../../core/models/tienda.dart';
+import '../../core/theme/dynamic_theme_provider.dart';
+import '../tienda/tienda_header_widget.dart';
 import 'recomendaciones_section.dart';
 
 /// Vitrina del cliente (CU-11). En modo servidor lee el catálogo público
@@ -59,6 +62,29 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
       context.read<RecommendationService>().loadRecommendations(tiendaId);
     }
   }
+  Tienda? _tiendaActiva(CatalogoService catalogo) {
+    final id = catalogo.selectedTiendaId;
+    if (id == null) return null;
+    for (final t in catalogo.tiendas) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
+  void _onSeleccionarTienda(int? tiendaId, CatalogoService catalogo) {
+    catalogo.setTienda(tiendaId);
+    if (tiendaId == null) {
+      context.read<DynamicThemeProvider>().resetToDefault();
+    } else {
+      for (final t in catalogo.tiendas) {
+        if (t.id == tiendaId) {
+          context.read<DynamicThemeProvider>().setStore(t);
+          break;
+        }
+      }
+    }
+  }
+
 
   /// Agregado rápido desde la tarjeta: sólo tiene sentido cuando no hay que
   /// elegir entre varias variantes; si las hay, se abre el detalle.
@@ -165,7 +191,7 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                     FiltroTiendas(
                       tiendas: catalogo.tiendas,
                       seleccionada: catalogo.selectedTiendaId,
-                      onSeleccionar: catalogo.setTienda,
+                      onSeleccionar: (id) => _onSeleccionarTienda(id, catalogo),
                     ),
                     const SizedBox(height: 14),
                   ],
@@ -229,6 +255,7 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                             onPressed: () {
                               _searchController.clear();
                               catalogo.limpiarFiltrosVitrina();
+                              context.read<DynamicThemeProvider>().resetToDefault();
                               setState(() {});
                             },
                             style: TextButton.styleFrom(
@@ -246,6 +273,17 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+
+                  if (_tiendaActiva(catalogo) != null) ...[
+                    TiendaHeaderWidget(
+                      tienda: _tiendaActiva(catalogo)!,
+                      onCerrarFiltro: () {
+                        catalogo.setTienda(null);
+                        context.read<DynamicThemeProvider>().resetToDefault();
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                  ],
 
                   if (catalogo.selectedTiendaId != null)
                     RecomendacionesSection(
