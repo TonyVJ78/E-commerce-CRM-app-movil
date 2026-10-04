@@ -111,13 +111,17 @@ class RecommendationService extends ChangeNotifier {
     _recentEvents[key] = now;
 
     try {
-      await _client.postInteraction({
+      final response = await _client.postInteraction({
         'tienda_id': tiendaId,
         'tipo_interaccion': type,
         'producto_id': ?productoId,
         if (normalizedTerm.isNotEmpty) 'termino_busqueda': normalizedTerm,
       });
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw StateError('No se registró la interacción');
+      }
     } catch (_) {
+      _recentEvents.remove(key);
       // La telemetría no debe bloquear la navegación del Cliente.
     }
   }

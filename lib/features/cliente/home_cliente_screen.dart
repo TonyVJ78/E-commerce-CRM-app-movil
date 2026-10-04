@@ -60,12 +60,17 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
       productoId: producto.id,
       type: 'CLICK',
     );
-    return showModalBottomSheet(
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ProductoDetailSheet(producto: producto),
     );
+    if (mounted && _selectedStoreId == producto.tiendaId) {
+      await context.read<RecommendationService>().loadRecommendations(
+        producto.tiendaId,
+      );
+    }
   }
 
   Future<void> _selectStore(int? storeId) async {
@@ -83,15 +88,19 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
     }
   }
 
-  void _search(String value) {
+  Future<void> _search(String value) async {
     final catalog = context.read<CatalogoService>();
     catalog.setSearch(value, tiendaId: _selectedStoreId);
     if (_selectedStoreId != null && value.trim().isNotEmpty) {
-      context.read<RecommendationService>().registerInteraction(
+      final recommendations = context.read<RecommendationService>();
+      await recommendations.registerInteraction(
         tiendaId: _selectedStoreId!,
         type: 'SEARCH',
         searchTerm: value,
       );
+      if (mounted && _selectedStoreId != null) {
+        await recommendations.loadRecommendations(_selectedStoreId!);
+      }
     }
   }
 

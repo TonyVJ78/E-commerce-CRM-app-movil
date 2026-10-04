@@ -6,6 +6,7 @@ import 'package:kantu_market/core/services/recommendation_service.dart';
 
 class FakeRecommendationClient implements RecommendationClient {
   RecommendationResponse response;
+  RecommendationResponse interactionResponse = const RecommendationResponse(201, '{}');
   final interactions = <Map<String, dynamic>>[];
   Completer<RecommendationResponse>? completer;
 
@@ -21,7 +22,7 @@ class FakeRecommendationClient implements RecommendationClient {
     Map<String, dynamic> body,
   ) async {
     interactions.add(body);
-    return const RecommendationResponse(201, '{}');
+    return interactionResponse;
   }
 }
 
@@ -92,5 +93,43 @@ void main() {
 
     expect(client.interactions, hasLength(1));
     expect(client.interactions.single['producto_id'], 2);
+  });
+
+  test('VIEW y SEARCH usan el contrato de interacciones de CU-14', () async {
+    final client = FakeRecommendationClient(
+      const RecommendationResponse(200, '[]'),
+    );
+    final service = RecommendationService(client: client);
+
+    await service.registerInteraction(tiendaId: 7, productoId: 2, type: 'VIEW');
+    await service.registerInteraction(
+      tiendaId: 7,
+      type: 'SEARCH',
+      searchTerm: '  Calzado  ',
+    );
+
+    expect(client.interactions[0], {
+      'tienda_id': 7,
+      'tipo_interaccion': 'VIEW',
+      'producto_id': 2,
+    });
+    expect(client.interactions[1], {
+      'tienda_id': 7,
+      'tipo_interaccion': 'SEARCH',
+      'termino_busqueda': 'calzado',
+    });
+  });
+
+  test('una interacción rechazada puede reintentarse', () async {
+    final client = FakeRecommendationClient(
+      const RecommendationResponse(200, '[]'),
+    )..interactionResponse = const RecommendationResponse(429, '{}');
+    final service = RecommendationService(client: client);
+
+    await service.registerInteraction(tiendaId: 7, productoId: 2, type: 'CLICK');
+    client.interactionResponse = const RecommendationResponse(201, '{}');
+    await service.registerInteraction(tiendaId: 7, productoId: 2, type: 'CLICK');
+
+    expect(client.interactions, hasLength(2));
   });
 }
