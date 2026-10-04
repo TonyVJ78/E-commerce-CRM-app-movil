@@ -73,4 +73,6 @@
 
   // --- Chatbot Asistente IA (en cuarentena para endpoint backend futuro) ---
   static const String chatbot = '/ia/chatbot/';
+  // --- Notificaciones Push en Vivo (CU-18) ---
+  static const String registrarDispositivo = '/usuarios/dispositivos/';
 }
