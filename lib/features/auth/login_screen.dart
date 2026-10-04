@@ -5,7 +5,7 @@ import '../../core/services/auth_service.dart';
 import '../shared/custom_button.dart';
 import '../shared/custom_text_field.dart';
 import 'register_screen.dart';
-import 'password_recovery_screen.dart';
+import 'forgot_password_screen.dart';
 import '../shared/home_shell.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -195,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const PasswordRecoveryScreen()),
+                                MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
                               );
                             },
                             child: const Text(

@@ -1,13 +1,13 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
-import '../../core/constants/api_constants.dart';
-import '../../core/models/producto.dart';
-import '../../core/services/api_service.dart';
+import '../constants/api_constants.dart';
+import '../models/producto.dart';
+import 'api_service.dart';
 
-/// Un mensaje de la conversación con el asistente.
+/// Un mensaje de la conversaci├│n con el asistente.
 class MensajeChat {
   final bool esUsuario;
 
@@ -33,10 +33,11 @@ class MensajeChat {
 
 /// Chatbot de recomendaciones (`POST /api/ia/chatbot/`).
 ///
-/// EN CUARENTENA: El backend aún no implementa la ruta /api/ia/chatbot/.
-/// Este servicio se mantiene aislado de la interfaz gráfica y providers principales.
+/// El backend no guarda la conversaci├│n, as├¡ que aqu├¡ se lleva el historial y
+/// se manda completo en cada mensaje. Vive como provider para que la charla
+/// siga ah├¡ al cerrar la pantalla y volver; se reinicia al cambiar de cuenta.
 class ChatbotService extends ChangeNotifier {
-  /// El modelo puede consultar el catálogo varias veces antes de contestar.
+  /// El modelo puede consultar el cat├ílogo varias veces antes de contestar.
   static const Duration _timeout = Duration(seconds: 60);
 
   static const MensajeChat _saludo = MensajeChat(
@@ -106,7 +107,8 @@ class ChatbotService extends ChangeNotifier {
           ApiConstants.chatbot,
           {'mensajes': historial},
           auth: true,
-        ).timeout(_timeout);
+          timeout: _timeout,
+        );
         respuesta = res.statusCode == 200
             ? _desdeJson(res.bodyBytes)
             : _error(res.statusCode, utf8.decode(res.bodyBytes, allowMalformed: true));
@@ -149,7 +151,7 @@ class ChatbotService extends ChangeNotifier {
   static MensajeChat _error(int status, String body) {
     String mensaje;
     if (status == 429) {
-      mensaje = 'Vas muy rápido 😅. Espera un momento y vuelve a intentarlo.';
+      mensaje = 'Vas muy rápido. Espera un momento y vuelve a intentarlo.';
     } else {
       mensaje = 'No pude responder ahora. Intenta de nuevo en unos segundos.';
       try {

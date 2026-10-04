@@ -16,6 +16,7 @@ import 'producto_detail_sheet.dart';
 import '../../core/models/tienda.dart';
 import '../../core/theme/dynamic_theme_provider.dart';
 import '../tienda/tienda_header_widget.dart';
+import 'chatbot_screen.dart';
 import 'recomendaciones_section.dart';
 
 /// Vitrina del cliente (CU-11). En modo servidor lee el catálogo público
@@ -131,6 +132,17 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
         title: 'Kantu Market',
         showBackButton: false,
         actions: [
+          IconButton(
+            tooltip: 'Asistente IA',
+            icon: const Icon(Icons.auto_awesome, color: KantuColors.primary),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ChatbotScreen(),
+                ),
+              );
+            },
+          ),
           // Atajo al carrito con su total. La pestaña de abajo ya lleva el
           // contador, así que aquí basta un botón discreto y no un FAB que
           // tape la última fila de productos.
@@ -323,7 +335,7 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
@@ -345,6 +357,23 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                 ),
               ),
           ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const ChatbotScreen(),
+            ),
+          );
+        },
+        backgroundColor: KantuColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        icon: const Icon(Icons.auto_awesome, size: 20),
+        label: const Text(
+          'Pregúntale a Kantu',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
         ),
       ),
     );

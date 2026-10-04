@@ -7,15 +7,15 @@ import 'package:provider/provider.dart';
 import '../../core/constants/colors.dart';
 import '../../core/models/producto.dart';
 import '../../core/services/auth_service.dart';
-import 'chatbot_service.dart';
+import '../../core/services/chatbot_service.dart';
 import '../shared/producto_imagen.dart';
-import '../cliente/producto_detail_sheet.dart';
+import 'producto_detail_sheet.dart';
 
 /// Chat con Kantu, el asistente de recomendaciones.
 ///
 /// Las respuestas llegan en Markdown. Los productos citados se pueden abrir
 /// tocando su enlace en el texto o la tarjeta que aparece debajo; ambos abren
-/// la misma hoja de detalle del catálogo, desde donde se agrega al carrito.
+/// la misma hoja de detalle del cat├ílogo, desde donde se agrega al carrito.
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
 
@@ -478,7 +478,7 @@ class _EscribiendoState extends State<_Escribiendo> with SingleTickerProviderSta
           ),
         ),
         child: Semantics(
-          label: 'Kantu está escribiendo',
+          label: 'Kantu est├í escribiendo',
           child: AnimatedBuilder(
             animation: _ctrl,
             builder: (_, _) => Row(

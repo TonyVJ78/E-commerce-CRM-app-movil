@@ -1,3 +1,4 @@
+﻿import 'push_notification_service.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,11 +11,15 @@ class AuthService extends ChangeNotifier {
   Usuario? _currentUser;
   bool _isLoading = false;
   String? _errorMessage;
+  String? _telefono;
+  String? _direccionEnvio;
 
   Usuario? get currentUser => _currentUser;
   bool get isAuthenticated => _currentUser != null;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  String? get telefono => _telefono;
+  String? get direccionEnvio => _direccionEnvio;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -23,9 +28,11 @@ class AuthService extends ChangeNotifier {
       try {
         final map = jsonDecode(userJson);
         _currentUser = Usuario.fromMap(map);
-        notifyListeners();
       } catch (_) {}
     }
+    _telefono = prefs.getString('km_user_telefono');
+    _direccionEnvio = prefs.getString('km_user_direccion');
+    notifyListeners();
   }
 
   void _saveUserToStorage(Usuario user) async {
@@ -36,6 +43,32 @@ class AuthService extends ChangeNotifier {
   Future<void> _clearUserFromStorage() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('km_user');
+  }
+
+  // --- PREFERENCIAS DE CONTACTO Y ENVÍO (CU-05 & CU-19) ---
+  Future<bool> guardarPreferenciasEntrega({
+    required String telefono,
+    required String direccionEnvio,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('km_user_telefono', telefono.trim());
+      await prefs.setString('km_user_direccion', direccionEnvio.trim());
+      _telefono = telefono.trim();
+      _direccionEnvio = direccionEnvio.trim();
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'No se pudieron guardar las preferencias: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   // --- PASSWORD COMPLEXITY VALIDATION ---
@@ -61,7 +94,6 @@ class AuthService extends ChangeNotifier {
 
     try {
       if (ApiService.instance.useOnlineBackend) {
-        // Intento Online
         try {
           final res = await ApiService.instance.post(ApiConstants.login, {
             'email': email.trim(),
@@ -76,42 +108,31 @@ class AuthService extends ChangeNotifier {
             );
             _currentUser = Usuario.fromJson(data['usuario']);
             _saveUserToStorage(_currentUser!);
+            PushNotificationService.instance.sincronizarTokenConBackend();
             _isLoading = false;
             notifyListeners();
             return true;
           } else if (res.statusCode >= 500) {
-            _errorMessage = 'El servidor tuvo un problema (código ${res.statusCode}). '
-                'Vuelve a intentarlo en un momento.';
+            _errorMessage = 'El servidor tuvo un problema (código ${res.statusCode}). Vuelve a intentarlo en un momento.';
             _isLoading = false;
             notifyListeners();
             return false;
           } else {
-            // Un 401 es una respuesta clara del servidor, no una excusa para
-            // buscar la cuenta en la base local: hacerlo dejaba entrar con un
-            // usuario de SQLite y toda la sesión —catálogo, tiendas, carrito—
-            // salía de datos que no son los del proyecto, sin que nada lo
-            // dijera. Si el correo no está en el servidor, se dice y ya.
-            final data = jsonDecode(res.body);
+            final data = _parseResponse(res.body);
             _errorMessage = data['error'] ?? data['detail'] ?? 'Credenciales incorrectas.';
             _isLoading = false;
             notifyListeners();
             return false;
           }
         } catch (_) {
-          // Estando en modo servidor no se busca la cuenta en la base local.
-          // Ese respaldo silencioso era el origen de "entro como empresa y no
-          // salen mis tiendas": el usuario entraba con el homónimo de SQLite,
-          // cuyas tiendas pertenecen a otra cuenta, y nada indicaba que lo que
-          // veía no era del proyecto. Mejor no entrar y decir por qué.
-          _errorMessage = 'No se pudo contactar al servidor. Revisa tu conexión a '
-              'internet y vuelve a intentarlo.';
+          _errorMessage = 'No se pudo contactar al servidor. Revisa tu conexión a internet y vuelve a intentarlo.';
           _isLoading = false;
           notifyListeners();
           return false;
         }
       }
 
-      // Modo autónomo: la base local es la única fuente, y se sabe.
+      // Modo autónomo SQLite
       final userMap = await DatabaseHelper.instance.loginUser(email, password);
       if (userMap != null) {
         _currentUser = Usuario.fromMap(userMap);
@@ -169,8 +190,8 @@ class AuthService extends ChangeNotifier {
             notifyListeners();
             return true;
           } else {
-            final data = jsonDecode(res.body);
-            _errorMessage = data.toString();
+            final data = _parseResponse(res.body);
+            _errorMessage = data['error'] ?? data['detail'] ?? data.toString();
             _isLoading = false;
             notifyListeners();
             return false;
@@ -211,8 +232,6 @@ class AuthService extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // Intento de invalidar el refresh token en el backend (blacklist).
-    // Si falla o no hay conexión, igual se cierra la sesión localmente.
     if (ApiService.instance.useOnlineBackend) {
       try {
         final refreshToken = await ApiService.instance.getRefreshToken();
@@ -234,10 +253,11 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- UPDATE PROFILE ---
+  // --- UPDATE PROFILE (CU04: Datos Personales) ---
   Future<bool> updatePerfil(String firstName, String lastName) async {
     if (_currentUser == null) return false;
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
@@ -264,30 +284,236 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // --- RECUPERAR CONTRASEÑA ---
-  Future<bool> requestPasswordReset(String email, String newPassword) async {
+  // --- RECUPERACIÓN DE CONTRASEÑA (CU-05: Solicitar Email) ---
+  Future<bool> solicitarRecuperacionPassword(String email) async {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty || !trimmed.contains('@')) {
+      _errorMessage = 'Ingresa un correo electrónico válido.';
+      notifyListeners();
+      return false;
+    }
+
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final exists = await DatabaseHelper.instance.userExists(email);
-      if (!exists) {
-        _errorMessage = 'No se encontró ninguna cuenta asociada a este correo.';
-        _isLoading = false;
-        notifyListeners();
-        return false;
+      if (ApiService.instance.useOnlineBackend) {
+        try {
+          final res = await ApiService.instance.post(ApiConstants.passwordReset, {
+            'email': trimmed,
+          });
+
+          if (res.statusCode == 200) {
+            _isLoading = false;
+            notifyListeners();
+            return true;
+          } else {
+            final data = _parseResponse(res.body);
+            _errorMessage = data['error'] ?? data['detail'] ?? 'No se pudo procesar la solicitud.';
+            _isLoading = false;
+            notifyListeners();
+            return false;
+          }
+        } catch (_) {
+          _errorMessage = 'No se pudo contactar al servidor para la recuperación.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
       }
 
-      await DatabaseHelper.instance.resetPassword(email, newPassword);
+      // Modo local / offline
+      final exists = await DatabaseHelper.instance.userExists(trimmed);
+      if (!exists) {
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = 'Error al restablecer contraseña: $e';
+      _errorMessage = 'Error al solicitar recuperación: $e';
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  // --- CONFIRMAR RESET DE CONTRASEÑA (CU-05: Con Token y Nueva Clave) ---
+  Future<bool> confirmarResetPassword({
+    required String tokenOEnlace,
+    required String nuevaPassword,
+    String? uid,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    if (!isPasswordValid(nuevaPassword)) {
+      _errorMessage = 'La nueva contraseña debe tener al menos 8 caracteres, incluyendo letras, números y símbolos.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    String parsedUid = uid?.trim() ?? '';
+    String parsedToken = tokenOEnlace.trim();
+
+    if (parsedToken.contains('/recuperar-password/')) {
+      final parts = parsedToken.split('/recuperar-password/').last.split('/');
+      if (parts.length >= 2) {
+        parsedUid = parts[0];
+        parsedToken = parts[1];
+      }
+    } else if (parsedToken.contains('/')) {
+      final parts = parsedToken.split('/');
+      if (parts.length >= 2) {
+        parsedUid = parts[0];
+        parsedToken = parts[1];
+      }
+    } else if (parsedToken.contains(':')) {
+      final parts = parsedToken.split(':');
+      if (parts.length >= 2) {
+        parsedUid = parts[0];
+        parsedToken = parts[1];
+      }
+    }
+
+    try {
+      if (ApiService.instance.useOnlineBackend) {
+        try {
+          final res = await ApiService.instance.post(ApiConstants.passwordResetConfirm, {
+            'uid': parsedUid,
+            'token': parsedToken,
+            'new_password': nuevaPassword,
+            'new_password_confirm': nuevaPassword,
+          });
+
+          if (res.statusCode == 200) {
+            _isLoading = false;
+            notifyListeners();
+            return true;
+          } else {
+            final data = _parseResponse(res.body);
+            String errorMsg = 'El token es inválido o ha expirado.';
+            if (data['error'] != null) {
+              errorMsg = data['error'].toString();
+            } else if (data['new_password'] != null) {
+              final val = data['new_password'];
+              errorMsg = val is List ? val.join(' ') : val.toString();
+            } else if (data['token'] != null) {
+              final val = data['token'];
+              errorMsg = val is List ? val.join(' ') : val.toString();
+            } else if (data['detail'] != null) {
+              errorMsg = data['detail'].toString();
+            }
+            _errorMessage = errorMsg;
+            _isLoading = false;
+            notifyListeners();
+            return false;
+          }
+        } catch (_) {
+          _errorMessage = 'Error de conexión al confirmar restablecimiento de contraseña.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+      }
+
+      // Modo local / offline
+      if (_currentUser != null) {
+        await DatabaseHelper.instance.resetPassword(_currentUser!.email, nuevaPassword);
+      }
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Error al confirmar contraseña: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // --- CAMBIO DE CONTRASEÑA AUTENTICADO (CU-05: Seguridad de Perfil) ---
+  Future<bool> cambiarPassword(String actual, String nueva) async {
+    if (_currentUser == null) {
+      _errorMessage = 'Debes iniciar sesión para cambiar tu contraseña.';
+      notifyListeners();
+      return false;
+    }
+
+    if (!isPasswordValid(nueva)) {
+      _errorMessage = 'La nueva contraseña debe tener al menos 8 caracteres, incluyendo letras, números y símbolos.';
+      notifyListeners();
+      return false;
+    }
+
+    if (actual == nueva) {
+      _errorMessage = 'La nueva contraseña debe ser diferente a la actual.';
+      notifyListeners();
+      return false;
+    }
+
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      if (ApiService.instance.useOnlineBackend) {
+        final checkRes = await ApiService.instance.post(ApiConstants.login, {
+          'email': _currentUser!.email,
+          'password': actual,
+        });
+
+        if (checkRes.statusCode != 200) {
+          _errorMessage = 'La contraseña actual ingresada es incorrecta.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        await DatabaseHelper.instance.resetPassword(_currentUser!.email, nueva);
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        final checkUser = await DatabaseHelper.instance.loginUser(_currentUser!.email, actual);
+        if (checkUser == null) {
+          _errorMessage = 'La contraseña actual ingresada es incorrecta.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
+        await DatabaseHelper.instance.resetPassword(_currentUser!.email, nueva);
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      }
+    } catch (e) {
+      _errorMessage = 'Error al actualizar la contraseña: $e';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Compatibilidad hacia atrás
+  Future<bool> requestPasswordReset(String email, String newPassword) async {
+    return confirmarResetPassword(tokenOEnlace: 'legacy', nuevaPassword: newPassword);
+  }
+
+  static Map<String, dynamic> _parseResponse(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {'detail': body};
+    } catch (_) {
+      return {'detail': body};
     }
   }
 }

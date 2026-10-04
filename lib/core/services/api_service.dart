@@ -31,6 +31,8 @@ class ApiService {
   String get baseUrl => _baseUrl;
   bool get useOnlineBackend => _useOnlineBackend;
 
+  void setOnlineBackend(bool value) => _useOnlineBackend = value;
+
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final urlDelBuild = ApiConstants.buildBaseUrl;
@@ -152,11 +154,16 @@ class ApiService {
     );
   }
 
-  Future<http.Response> post(String endpoint, Map<String, dynamic> body, {bool auth = false}) {
+  Future<http.Response> post(
+    String endpoint,
+    Map<String, dynamic> body, {
+    bool auth = false,
+    Duration? timeout,
+  }) {
     return _enviar(
       () async => http
           .post(_uri(endpoint), headers: await _headers(auth: auth), body: jsonEncode(body))
-          .timeout(_timeout),
+          .timeout(timeout ?? _timeout),
       auth: auth,
     );
   }
