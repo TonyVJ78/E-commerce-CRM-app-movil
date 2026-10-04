@@ -85,12 +85,12 @@ class Pedido {
       id: id,
       clienteId: clienteId,
       clienteEmail: cliente is Map ? cliente['email']?.toString() ?? '' : '',
-      tiendaId: 0,
+      tiendaId: int.tryParse(json['tienda_id']?.toString() ?? '') ?? 0,
       tiendaNombre: json['tienda_nombre']?.toString() ?? tiendaNombre,
       estadoActual: estado,
       estadoEtiqueta: json['estado_etiqueta']?.toString() ?? '',
       fecha: json['fecha']?.toString() ?? '',
-      subtotal: total,
+      subtotal: double.tryParse(json['subtotal']?.toString() ?? '') ?? total,
       total: total,
       // El servidor puede no informar el método (listado de la empresa): vacío
       // para que la tarjeta no muestre uno inventado.

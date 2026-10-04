@@ -92,6 +92,7 @@ class _CartScreenState extends State<CartScreen> {
             }
 
             if (clientSecret == null) return;
+            final modalNav = Navigator.of(ctx);
             setModalState(() {
               pagandoStripe = true;
               stripeError = null;
@@ -119,7 +120,6 @@ class _CartScreenState extends State<CartScreen> {
               return;
             }
 
-            final modalNav = Navigator.of(ctx);
             final pedido = await cartService.checkoutStripeRemoto(
               cliente: cliente,
               paymentIntentId: paymentIntentId,

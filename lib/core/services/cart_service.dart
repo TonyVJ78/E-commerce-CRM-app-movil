@@ -49,7 +49,8 @@ class CartService extends ChangeNotifier {
   String nombreTienda(int tiendaId) {
     if (_nombresTienda.containsKey(tiendaId)) return _nombresTienda[tiendaId]!;
     for (final item in _items) {
-      if (item.producto.tiendaId == tiendaId && item.producto.tiendaNombre.isNotEmpty) {
+      if (item.producto.tiendaId == tiendaId &&
+          item.producto.tiendaNombre.isNotEmpty) {
         return item.producto.tiendaNombre;
       }
     }
@@ -83,7 +84,10 @@ class CartService extends ChangeNotifier {
 
   Future<bool> _loadCarritoRemoto() async {
     try {
-      final res = await ApiService.instance.get(ApiConstants.carrito, auth: true);
+      final res = await ApiService.instance.get(
+        ApiConstants.carrito,
+        auth: true,
+      );
       if (res.statusCode != 200) return false;
 
       final data = jsonDecode(res.body);
@@ -122,7 +126,8 @@ class CartService extends ChangeNotifier {
       tiendaId: tiendaId,
       nombre: json['variante_nombre']?.toString() ?? 'Unica',
       sku: json['variante_sku']?.toString() ?? '',
-      precio: double.tryParse(json['precio_unitario']?.toString() ?? '0') ?? 0.0,
+      precio:
+          double.tryParse(json['precio_unitario']?.toString() ?? '0') ?? 0.0,
       stock: _entero(json['stock_disponible']),
     );
 
@@ -171,7 +176,8 @@ class CartService extends ChangeNotifier {
     final nuevaCantidad = (existente?.cantidad ?? 0) + cantidad;
 
     if (variante.stock > 0 && nuevaCantidad > variante.stock) {
-      _errorMessage = 'Solo quedan ${variante.stock} unidades de ${variante.nombre}.';
+      _errorMessage =
+          'Solo quedan ${variante.stock} unidades de ${variante.nombre}.';
       notifyListeners();
       return false;
     }
@@ -213,11 +219,10 @@ class CartService extends ChangeNotifier {
         return await _patchCantidadRemota(existente!.idRemoto!, nuevaCantidad);
       }
 
-      final res = await ApiService.instance.post(
-        ApiConstants.carritoItems,
-        {'tienda_id': producto.tiendaId, 'variante_id': variante.id},
-        auth: true,
-      );
+      final res = await ApiService.instance.post(ApiConstants.carritoItems, {
+        'tienda_id': producto.tiendaId,
+        'variante_id': variante.id,
+      }, auth: true);
       if (res.statusCode != 201) {
         if (res.statusCode < 500) {
           _errorMessage = _mensajeError(res.body);
@@ -242,7 +247,11 @@ class CartService extends ChangeNotifier {
     }
   }
 
-  Future<bool> _patchCantidadRemota(int itemId, int cantidad, {bool recargar = true}) async {
+  Future<bool> _patchCantidadRemota(
+    int itemId,
+    int cantidad, {
+    bool recargar = true,
+  }) async {
     try {
       final res = await ApiService.instance.patch(
         ApiConstants.carritoItemDetalle(itemId),
@@ -277,7 +286,8 @@ class CartService extends ChangeNotifier {
       return;
     }
     if (item.variante.stock > 0 && cantidad > item.variante.stock) {
-      _errorMessage = 'Solo quedan ${item.variante.stock} unidades disponibles.';
+      _errorMessage =
+          'Solo quedan ${item.variante.stock} unidades disponibles.';
       notifyListeners();
       return;
     }
@@ -291,8 +301,10 @@ class CartService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> incrementar(ItemCarrito item) => cambiarCantidad(item, item.cantidad + 1);
-  Future<void> decrementar(ItemCarrito item) => cambiarCantidad(item, item.cantidad - 1);
+  Future<void> incrementar(ItemCarrito item) =>
+      cambiarCantidad(item, item.cantidad + 1);
+  Future<void> decrementar(ItemCarrito item) =>
+      cambiarCantidad(item, item.cantidad - 1);
 
   Future<void> eliminar(ItemCarrito item) async {
     if (_online && item.idRemoto != null) {
@@ -353,8 +365,13 @@ class CartService extends ChangeNotifier {
     try {
       final primerItem = _items.first;
       final tiendaId = primerItem.producto.tiendaId;
-      final itemsDeLaTienda = _items.where((i) => i.producto.tiendaId == tiendaId).toList();
-      final totalTienda = itemsDeLaTienda.fold(0.0, (suma, i) => suma + i.total);
+      final itemsDeLaTienda = _items
+          .where((i) => i.producto.tiendaId == tiendaId)
+          .toList();
+      final totalTienda = itemsDeLaTienda.fold(
+        0.0,
+        (suma, i) => suma + i.total,
+      );
 
       final pedido = await DatabaseHelper.instance.createPedido(
         clienteId: cliente.id,
@@ -390,7 +407,11 @@ class CartService extends ChangeNotifier {
   /// Solo tiene sentido en modo servidor: el pago se valida contra el backend.
   Future<Map<String, dynamic>?> crearIntentoPagoStripe() async {
     try {
-      final res = await ApiService.instance.post(ApiConstants.carritoPagoIntento, {}, auth: true);
+      final res = await ApiService.instance.post(
+        ApiConstants.carritoPagoIntento,
+        {},
+        auth: true,
+      );
       if (res.statusCode != 200) {
         _errorMessage = _mensajeError(res.body);
         notifyListeners();
@@ -422,11 +443,10 @@ class CartService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final res = await ApiService.instance.post(
-        ApiConstants.carritoCheckout,
-        {'metodo_pago': 'stripe', 'payment_intent_id': paymentIntentId},
-        auth: true,
-      );
+      final res = await ApiService.instance.post(ApiConstants.carritoCheckout, {
+        'metodo_pago': 'stripe',
+        'payment_intent_id': paymentIntentId,
+      }, auth: true);
 
       if (res.statusCode != 201) {
         _errorMessage = _mensajeError(res.body);
@@ -467,7 +487,11 @@ class CartService extends ChangeNotifier {
     }
   }
 
-  Future<void> loadPedidos({int? clienteId, int? tiendaId, int? propietarioId}) async {
+  Future<void> loadPedidos({
+    int? clienteId,
+    int? tiendaId,
+    int? propietarioId,
+  }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -485,6 +509,7 @@ class CartService extends ChangeNotifier {
       }
     } catch (e) {
       _errorMessage = 'No se pudieron cargar los pedidos: $e';
+      if (_online) _pedidos = [];
     }
     _isLoading = false;
     notifyListeners();
