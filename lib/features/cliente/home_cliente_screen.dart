@@ -11,7 +11,9 @@ import '../shared/home_shell.dart';
 import '../shared/kantu_app_bar.dart';
 import '../shared/kantu_search_field.dart';
 import '../shared/producto_imagen.dart';
+import '../../core/services/recommendation_service.dart';
 import 'producto_detail_sheet.dart';
+import 'recomendaciones_section.dart';
 
 /// Vitrina del cliente (CU-11). En modo servidor lee el catálogo público
 /// (`/api/catalogo/productos/`, con búsqueda y filtro del lado del servidor) y
@@ -43,13 +45,19 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
     super.dispose();
   }
 
-  Future<void> _abrirDetalle(Producto producto) {
-    return showModalBottomSheet(
+  Future<void> _abrirDetalle(Producto producto) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ProductoDetailSheet(producto: producto),
     );
+    if (mounted) {
+      final catalogo = context.read<CatalogoService>();
+      final tiendaId = catalogo.selectedTiendaId ??
+          (catalogo.tiendas.isNotEmpty ? catalogo.tiendas.first.id : producto.tiendaId);
+      context.read<RecommendationService>().loadRecommendations(tiendaId);
+    }
   }
 
   /// Agregado rápido desde la tarjeta: sólo tiene sentido cuando no hay que
@@ -238,6 +246,19 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+
+                  if (catalogo.selectedTiendaId != null)
+                    RecomendacionesSection(
+                      key: ValueKey('recommendations-${catalogo.selectedTiendaId}'),
+                      tiendaId: catalogo.selectedTiendaId!,
+                      onProductTap: _abrirDetalle,
+                    )
+                  else if (catalogo.tiendas.isNotEmpty)
+                    RecomendacionesSection(
+                      key: ValueKey('recommendations-${catalogo.tiendas.first.id}'),
+                      tiendaId: catalogo.tiendas.first.id,
+                      onProductTap: _abrirDetalle,
+                    ),
                 ],
               ),
             ),

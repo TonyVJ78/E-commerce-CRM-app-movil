@@ -1,4 +1,4 @@
-class ApiConstants {
+﻿class ApiConstants {
   /// URL del backend fijada **al compilar**, para repartir un APK que ya sabe
   /// a qué servidor hablar sin que nadie toque Ajustes:
   ///
@@ -64,4 +64,13 @@ class ApiConstants {
       '/pedidos/mis-pedidos/$pedidoId/';
   static String resenasPedido(int pedidoId) =>
       '/pedidos/mis-pedidos/$pedidoId/resenas/';
+
+  // --- Inteligencia Artificial y Recomendaciones (CU-14) ---
+  static String recomendacionesTienda(int tiendaId) =>
+      '/ia/tiendas/$tiendaId/';
+  static const String iaEventos = '/ia/eventos/';
+  static const String iaInteracciones = '/ia/interacciones/';
+
+  // --- Chatbot Asistente IA (en cuarentena para endpoint backend futuro) ---
+  static const String chatbot = '/ia/chatbot/';
 }

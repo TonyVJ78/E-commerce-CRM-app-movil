@@ -5,6 +5,7 @@ import '../../core/constants/colors.dart';
 import '../../core/models/producto.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/cart_service.dart';
+import '../../core/services/recommendation_service.dart';
 import '../shared/custom_button.dart';
 import '../shared/producto_imagen.dart';
 
@@ -30,6 +31,14 @@ class _ProductoDetailSheetState extends State<ProductoDetailSheet> {
   void initState() {
     super.initState();
     _variante = widget.producto.variantePrincipal;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<RecommendationService>().registerInteraction(
+        tiendaId: widget.producto.tiendaId,
+        productoId: widget.producto.id,
+        type: 'VIEW',
+      );
+    });
   }
 
   int get _stockDisponible => _variante?.stock ?? 0;
