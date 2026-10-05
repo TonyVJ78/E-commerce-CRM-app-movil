@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/colors.dart';
@@ -62,8 +62,8 @@ class _PasswordResetConfirmScreenState extends State<PasswordResetConfirmScreen>
 
     final authService = context.read<AuthService>();
     final ok = await authService.confirmarResetPassword(
-      tokenOEnlace: _tokenController.text.trim(),
-      nuevaPassword: _newPasswordController.text,
+      _tokenController.text.trim(),
+      _newPasswordController.text,
       uid: widget.initialUid,
     );
 

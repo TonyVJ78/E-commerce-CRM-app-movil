@@ -1,4 +1,4 @@
-﻿import 'push_notification_service.dart';
+import 'push_notification_service.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +20,12 @@ class AuthService extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get telefono => _telefono;
   String? get direccionEnvio => _direccionEnvio;
+
+  @visibleForTesting
+  void setCurrentUserForTesting(Usuario? user) {
+    _currentUser = user;
+    notifyListeners();
+  }
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -343,9 +349,9 @@ class AuthService extends ChangeNotifier {
   }
 
   // --- CONFIRMAR RESET DE CONTRASEÑA (CU-05: Con Token y Nueva Clave) ---
-  Future<bool> confirmarResetPassword({
-    required String tokenOEnlace,
-    required String nuevaPassword,
+  Future<bool> confirmarResetPassword(
+    String tokenOEnlace,
+    String nuevaPassword, {
     String? uid,
   }) async {
     _isLoading = true;
@@ -407,6 +413,9 @@ class AuthService extends ChangeNotifier {
             } else if (data['token'] != null) {
               final val = data['token'];
               errorMsg = val is List ? val.join(' ') : val.toString();
+            } else if (data['uid'] != null) {
+              final val = data['uid'];
+              errorMsg = val is List ? val.join(' ') : val.toString();
             } else if (data['detail'] != null) {
               errorMsg = data['detail'].toString();
             }
@@ -464,6 +473,45 @@ class AuthService extends ChangeNotifier {
 
     try {
       if (ApiService.instance.useOnlineBackend) {
+        // Intento 1: Consumir endpoint dedicado autenticado POST /api/auth/cambiar-password/
+        try {
+          final res = await ApiService.instance.post(
+            ApiConstants.cambiarPassword,
+            {
+              'password_actual': actual,
+              'password_nuevo': nueva,
+            },
+            auth: true,
+          );
+
+          if (res.statusCode == 200) {
+            await DatabaseHelper.instance.resetPassword(_currentUser!.email, nueva);
+            _isLoading = false;
+            notifyListeners();
+            return true;
+          } else if (res.statusCode == 400 || res.statusCode == 401 || res.statusCode == 403) {
+            final data = _parseResponse(res.body);
+            String errorMsg = 'Error al actualizar la contraseña.';
+            if (data['password_actual'] != null) {
+              final val = data['password_actual'];
+              errorMsg = val is List ? val.join(' ') : val.toString();
+            } else if (data['password_nuevo'] != null) {
+              final val = data['password_nuevo'];
+              errorMsg = val is List ? val.join(' ') : val.toString();
+            } else if (data['error'] != null) {
+              errorMsg = data['error'].toString();
+            } else if (data['detail'] != null) {
+              errorMsg = data['detail'].toString();
+            }
+            _errorMessage = errorMsg;
+            _isLoading = false;
+            notifyListeners();
+            return false;
+          }
+          // Si el endpoint devuelve 404 (aún no desplegado en el servidor remoto), continuamos al fallback
+        } catch (_) {}
+
+        // Fallback de verificación segura mediante reautenticación
         final checkRes = await ApiService.instance.post(ApiConstants.login, {
           'email': _currentUser!.email,
           'password': actual,
@@ -504,7 +552,7 @@ class AuthService extends ChangeNotifier {
 
   // Compatibilidad hacia atrás
   Future<bool> requestPasswordReset(String email, String newPassword) async {
-    return confirmarResetPassword(tokenOEnlace: 'legacy', nuevaPassword: newPassword);
+    return confirmarResetPassword('legacy', newPassword);
   }
 
   static Map<String, dynamic> _parseResponse(String body) {

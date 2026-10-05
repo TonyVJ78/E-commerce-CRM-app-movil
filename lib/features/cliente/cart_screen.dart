@@ -175,6 +175,69 @@ class _CartScreenState extends State<CartScreen> {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: KantuColors.textPrimary),
                 ),
                 const SizedBox(height: 16),
+                // Datos de Entrega y Contacto Autocompletados (CU-05)
+                Consumer<AuthService>(
+                  builder: (context, auth, _) {
+                    final direccion = auth.direccionEnvio ?? '';
+                    final telefono = auth.telefono ?? '';
+                    if (direccion.isEmpty && telefono.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: KantuColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: KantuColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on_outlined, size: 16, color: KantuColors.primary),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Datos de Entrega (Perfil)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: KantuColors.textPrimary,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                'Autocompletado',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (direccion.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              direccion,
+                              style: const TextStyle(fontSize: 12, color: KantuColors.textSecondary),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          if (telefono.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Contacto: $telefono',
+                              style: const TextStyle(fontSize: 11, color: KantuColors.textMuted),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
                 const Text(
                   'Método de Pago',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: KantuColors.textSecondary),

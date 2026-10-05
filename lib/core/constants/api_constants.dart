@@ -1,4 +1,4 @@
-﻿class ApiConstants {
+class ApiConstants {
   /// URL del backend fijada **al compilar**, para repartir un APK que ya sabe
   /// a qué servidor hablar sin que nadie toque Ajustes:
   ///
@@ -31,6 +31,7 @@
   static const String perfil = '/auth/perfil/';
   static const String passwordReset = '/auth/password-reset/';
   static const String passwordResetConfirm = '/auth/password-reset-confirm/';
+  static const String cambiarPassword = '/auth/cambiar-password/';
 
   // --- Tiendas (CU-06) y panel del vendedor (CU-10) ---
   static const String tiendas = '/tiendas/';

@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:kantu_market/core/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -27,8 +27,8 @@ void main() {
     test('confirmarResetPassword exige complejidad antes de enviar', () async {
       final auth = AuthService();
       final ok = await auth.confirmarResetPassword(
-        tokenOEnlace: 'token123',
-        nuevaPassword: 'debil',
+        'token123',
+        'debil',
       );
       expect(ok, isFalse);
       expect(auth.errorMessage, contains('al menos 8 caracteres'));

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/colors.dart';
@@ -586,25 +586,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 16),
 
             // Card 4: Botón de Cerrar Sesión (CU-03)
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: KantuColors.border),
-              ),
-              child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: KantuColors.error.withAlpha(20),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.logout, color: KantuColors.error, size: 20),
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: KantuColors.border),
                 ),
-                title: const Text('Cerrar Sesión', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: KantuColors.error)),
-                subtitle: const Text('Salir de la cuenta en este dispositivo', style: TextStyle(fontSize: 12, color: KantuColors.textSecondary)),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: KantuColors.textMuted),
-                onTap: () => _showLogoutDialog(context, authService),
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: KantuColors.error.withAlpha(20),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.logout, color: KantuColors.error, size: 20),
+                  ),
+                  title: const Text('Cerrar Sesión', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: KantuColors.error)),
+                  subtitle: const Text('Salir de la cuenta en este dispositivo', style: TextStyle(fontSize: 12, color: KantuColors.textSecondary)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: KantuColors.textMuted),
+                  onTap: () => _showLogoutDialog(context, authService),
+                ),
               ),
             ),
           ],
