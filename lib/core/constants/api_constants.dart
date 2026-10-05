@@ -74,6 +74,15 @@ class ApiConstants {
 
   // --- Chatbot Asistente IA (en cuarentena para endpoint backend futuro) ---
   static const String chatbot = '/ia/chatbot/';
+
   // --- Notificaciones Push en Vivo (CU-18) ---
   static const String registrarDispositivo = '/usuarios/dispositivos/';
+
+  // --- Micro-CRM: Gestión de Clientes (CU-15) ---
+  static String crmClientesTienda(int tiendaId) =>
+      '/tiendas/$tiendaId/crm/clientes/';
+  static String crmClienteDetalle(int tiendaId, int clienteId) =>
+      '/tiendas/$tiendaId/crm/clientes/$clienteId/';
+  static String crmInteracciones(int tiendaId, int clienteId) =>
+      '/tiendas/$tiendaId/crm/clientes/$clienteId/interacciones/';
 }

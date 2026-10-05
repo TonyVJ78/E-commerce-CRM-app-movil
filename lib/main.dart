@@ -7,6 +7,7 @@ import 'core/services/auth_service.dart';
 import 'core/services/cart_service.dart';
 import 'core/services/catalogo_service.dart';
 import 'core/services/chatbot_service.dart';
+import 'core/services/crm_service.dart';
 import 'core/services/dashboard_service.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/recommendation_service.dart';
@@ -45,6 +46,7 @@ void main() async {
         ChangeNotifierProvider<RecommendationService>(create: (_) => RecommendationService()),
         ChangeNotifierProvider<DynamicThemeProvider>(create: (_) => DynamicThemeProvider()),
         ChangeNotifierProvider<ChatbotService>(create: (_) => ChatbotService()),
+        ChangeNotifierProvider<CrmService>(create: (_) => CrmService()),
       ],
       child: const KantuMarketApp(),
     ),
