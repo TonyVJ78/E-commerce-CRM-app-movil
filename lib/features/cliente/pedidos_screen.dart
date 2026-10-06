@@ -235,7 +235,10 @@ class _TarjetaPedido extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    pedido.estadoActual.replaceAll('_', ' ').toUpperCase(),
+                    (pedido.estadoEtiqueta.isNotEmpty
+                            ? pedido.estadoEtiqueta
+                            : pedido.estadoActual.replaceAll('_', ' '))
+                        .toUpperCase(),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
