@@ -496,20 +496,10 @@ class CartService extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      if (_online && clienteId != null) {
-        final response = await ApiService.instance.get(
-          ApiConstants.misPedidos,
-          auth: true,
-        );
-        if (response.statusCode != 200) {
-          throw Exception(_mensajeError(response.body));
-        }
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final pedidos = (data['pedidos'] as List? ?? const [])
-            .cast<Map<String, dynamic>>();
-        _pedidos = pedidos
-            .map((pedido) => _pedidoDesdeApi(pedido, clienteId))
-            .toList();
+      if (_online) {
+        // En modo servidor el estado de cada pedido lo maneja la empresa (CU-22),
+        // así que la fuente de verdad es el backend, sin respaldo local.
+        _pedidos = await _loadPedidosRemoto(clienteId: clienteId, propietarioId: propietarioId);
       } else {
         _pedidos = await DatabaseHelper.instance.getPedidos(
           clienteId: clienteId,
@@ -519,28 +509,43 @@ class CartService extends ChangeNotifier {
       }
     } catch (e) {
       _errorMessage = 'No se pudieron cargar los pedidos: $e';
-      if (_online && clienteId != null) _pedidos = [];
+      if (_online) _pedidos = [];
     }
     _isLoading = false;
     notifyListeners();
   }
 
-  Pedido _pedidoDesdeApi(Map<String, dynamic> json, int clienteId) {
-    final pedidoId = _entero(json['id']);
-    final items = (json['items'] as List? ?? const []).map((item) {
-      final itemJson = Map<String, dynamic>.from(item as Map);
-      return ItemPedido.fromMap({
-        ...itemJson,
-        'pedido_id': pedidoId,
-        'variante_id': itemJson['variante_id'] ?? 0,
-      });
-    }).toList();
+  /// Cliente: `GET /pedidos/mis-pedidos/`. Empresa: los pedidos recibidos de
+  /// cada una de sus tiendas (`GET /tiendas/<id>/pedidos/`), del más nuevo al más antiguo.
+  Future<List<Pedido>> _loadPedidosRemoto({int? clienteId, int? propietarioId}) async {
+    if (clienteId != null) {
+      final res = await ApiService.instance.get(ApiConstants.misPedidos, auth: true);
+      if (res.statusCode != 200) throw Exception(_mensajeError(res.body));
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return [
+        for (final p in (data['pedidos'] as List? ?? const []))
+          Pedido.fromApi(Map<String, dynamic>.from(p as Map), clienteId: clienteId),
+      ];
+    }
 
-    return Pedido.fromMap({
-      ...json,
-      'cliente_id': clienteId,
-      'estado_actual': json['estado'] ?? json['estado_actual'],
-    }, items: items);
+    final resTiendas = await ApiService.instance.get(ApiConstants.tiendas, auth: true);
+    if (resTiendas.statusCode != 200) throw Exception(_mensajeError(resTiendas.body));
+    final decodificado = jsonDecode(resTiendas.body);
+    final tiendas = decodificado is Map ? (decodificado['results'] as List? ?? const []) : decodificado as List;
+
+    final pedidos = <Pedido>[];
+    for (final tienda in tiendas) {
+      final tiendaId = _entero((tienda as Map)['id']);
+      final res = await ApiService.instance.get(ApiConstants.pedidosTienda(tiendaId), auth: true);
+      if (res.statusCode != 200) continue;
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final nombre = (data['tienda'] as Map?)?['nombre']?.toString() ?? '';
+      for (final p in (data['pedidos'] as List? ?? const [])) {
+        pedidos.add(Pedido.fromApi(Map<String, dynamic>.from(p as Map), tiendaNombre: nombre));
+      }
+    }
+    pedidos.sort((a, b) => b.fecha.compareTo(a.fecha));
+    return pedidos;
   }
 
   static String _mensajeError(String body) {

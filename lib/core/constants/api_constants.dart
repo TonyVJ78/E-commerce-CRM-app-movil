@@ -65,6 +65,8 @@ class ApiConstants {
       '/pedidos/mis-pedidos/$pedidoId/';
   static String resenasPedido(int pedidoId) =>
       '/pedidos/mis-pedidos/$pedidoId/resenas/';
+  static String pedidosTienda(int tiendaId) =>
+      '/tiendas/$tiendaId/pedidos/';
 
   // --- Inteligencia Artificial y Recomendaciones (CU-14) ---
   static String recomendacionesTienda(int tiendaId) =>
