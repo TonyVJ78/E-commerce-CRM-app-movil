@@ -1,13 +1,18 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'core/constants/colors.dart';
+
 import 'core/services/api_service.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/cart_service.dart';
 import 'core/services/catalogo_service.dart';
 import 'core/services/chatbot_service.dart';
+import 'core/services/crm_service.dart';
 import 'core/services/dashboard_service.dart';
+import 'core/services/push_notification_service.dart';
+import 'core/services/recommendation_service.dart';
 import 'core/services/tienda_service.dart';
+import 'core/theme/dynamic_theme_provider.dart';
 import 'features/auth/login_screen.dart';
 import 'features/shared/home_shell.dart';
 
@@ -18,6 +23,18 @@ void main() async {
   final authService = AuthService();
   await authService.init();
 
+  // Inicialización de Firebase y Push Notification Service (CU-18)
+  // Regla Estricta: Manejo silencioso. Si la inicialización falla (p. ej. por falta de
+  // google-services.json local), se imprime el error en consola y la app arranca SIN crash.
+  try {
+    await Firebase.initializeApp();
+    await PushNotificationService.instance.init();
+  } catch (e) {
+    debugPrint(
+      '[FCM] Inicialización de Firebase omitida o fallida (modo offline/resiliente): $e',
+    );
+  }
+
   runApp(
     MultiProvider(
       providers: [
@@ -26,7 +43,10 @@ void main() async {
         ChangeNotifierProvider<CatalogoService>(create: (_) => CatalogoService()),
         ChangeNotifierProvider<CartService>(create: (_) => CartService()),
         ChangeNotifierProvider<DashboardService>(create: (_) => DashboardService()),
+        ChangeNotifierProvider<RecommendationService>(create: (_) => RecommendationService()),
+        ChangeNotifierProvider<DynamicThemeProvider>(create: (_) => DynamicThemeProvider()),
         ChangeNotifierProvider<ChatbotService>(create: (_) => ChatbotService()),
+        ChangeNotifierProvider<CrmService>(create: (_) => CrmService()),
       ],
       child: const KantuMarketApp(),
     ),
@@ -38,53 +58,15 @@ class KantuMarketApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<DynamicThemeProvider?>(context);
+    final theme = themeProvider?.currentTheme ?? DynamicThemeProvider().currentTheme;
+
     return MaterialApp(
+      navigatorKey: PushNotificationService.navigatorKey,
+      scaffoldMessengerKey: PushNotificationService.scaffoldMessengerKey,
       title: 'Kantu Market',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Inter',
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: KantuColors.primary,
-          primary: KantuColors.primary,
-          secondary: KantuColors.accent,
-          surface: KantuColors.surface,
-        ),
-        // Material 3 tiñe las superficies elevadas con el color semilla; sin
-        // esto los diálogos y menús salen rosados en vez de blancos.
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: KantuColors.textPrimary,
-          elevation: 0.5,
-          surfaceTintColor: Colors.transparent,
-        ),
-        dialogTheme: DialogThemeData(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        ),
-        popupMenuTheme: PopupMenuThemeData(
-          color: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        bottomSheetTheme: const BottomSheetThemeData(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-        ),
-        snackBarTheme: SnackBarThemeData(
-          behavior: SnackBarBehavior.floating,
-          insetPadding: const EdgeInsets.all(16),
-          contentTextStyle: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        scaffoldBackgroundColor: KantuColors.background,
-      ),
+      theme: theme,
       home: const AppInitializer(),
     );
   }

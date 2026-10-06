@@ -9,6 +9,7 @@ import '../../core/services/catalogo_service.dart';
 import '../shared/kantu_app_bar.dart';
 import '../shared/kantu_search_field.dart';
 import '../shared/producto_imagen.dart';
+import 'crm/tienda_crm_screen.dart';
 import 'producto_form_screen.dart';
 
 /// Catálogo de una tienda desde el panel de la empresa.
@@ -129,7 +130,19 @@ class _TiendaDetailScreenState extends State<TiendaDetailScreen> {
 
     return Scaffold(
       backgroundColor: KantuColors.background,
-      appBar: KantuAppBar(title: t.nombre),
+      appBar: KantuAppBar(
+        title: t.nombre,
+        actions: [
+          IconButton(
+            tooltip: 'Cartera de Clientes (Micro-CRM)',
+            icon: const Icon(Icons.people_alt_outlined, color: KantuColors.textPrimary),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => TiendaCrmScreen(tienda: t)),
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: _storeColor,
         foregroundColor: Colors.white,
@@ -282,6 +295,35 @@ class _CabeceraTienda extends StatelessWidget {
               style: const TextStyle(fontSize: 13, color: KantuColors.textSecondary),
             ),
           ],
+          const SizedBox(height: 14),
+          InkWell(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => TiendaCrmScreen(tienda: tienda)),
+            ),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: color.withAlpha(15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: color.withAlpha(40)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.people_alt_outlined, size: 18, color: color),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Gestionar Cartera de Clientes (Micro-CRM)',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+                    ),
+                  ),
+                  Icon(Icons.arrow_forward_ios, size: 12, color: color),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

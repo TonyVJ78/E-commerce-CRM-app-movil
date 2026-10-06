@@ -31,6 +31,7 @@ class ApiConstants {
   static const String perfil = '/auth/perfil/';
   static const String passwordReset = '/auth/password-reset/';
   static const String passwordResetConfirm = '/auth/password-reset-confirm/';
+  static const String cambiarPassword = '/auth/cambiar-password/';
 
   // --- Tiendas (CU-06) y panel del vendedor (CU-10) ---
   static const String tiendas = '/tiendas/';
@@ -64,8 +65,26 @@ class ApiConstants {
       '/pedidos/mis-pedidos/$pedidoId/';
   static String resenasPedido(int pedidoId) =>
       '/pedidos/mis-pedidos/$pedidoId/resenas/';
-  static String pedidosTienda(int tiendaId) => '/tiendas/$tiendaId/pedidos/';
+  static String pedidosTienda(int tiendaId) =>
+      '/tiendas/$tiendaId/pedidos/';
 
-  // --- Chatbot de recomendaciones (Claude) ---
+  // --- Inteligencia Artificial y Recomendaciones (CU-14) ---
+  static String recomendacionesTienda(int tiendaId) =>
+      '/ia/tiendas/$tiendaId/';
+  static const String iaEventos = '/ia/eventos/';
+  static const String iaInteracciones = '/ia/interacciones/';
+
+  // --- Chatbot Asistente IA (en cuarentena para endpoint backend futuro) ---
   static const String chatbot = '/ia/chatbot/';
+
+  // --- Notificaciones Push en Vivo (CU-18) ---
+  static const String registrarDispositivo = '/usuarios/dispositivos/';
+
+  // --- Micro-CRM: Gestión de Clientes (CU-15) ---
+  static String crmClientesTienda(int tiendaId) =>
+      '/tiendas/$tiendaId/crm/clientes/';
+  static String crmClienteDetalle(int tiendaId, int clienteId) =>
+      '/tiendas/$tiendaId/crm/clientes/$clienteId/';
+  static String crmInteracciones(int tiendaId, int clienteId) =>
+      '/tiendas/$tiendaId/crm/clientes/$clienteId/interacciones/';
 }

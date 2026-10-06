@@ -31,6 +31,8 @@ class ApiService {
   String get baseUrl => _baseUrl;
   bool get useOnlineBackend => _useOnlineBackend;
 
+  void setOnlineBackend(bool value) => _useOnlineBackend = value;
+
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     final urlDelBuild = ApiConstants.buildBaseUrl;

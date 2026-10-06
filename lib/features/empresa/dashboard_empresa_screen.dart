@@ -9,6 +9,7 @@ import '../shared/home_shell.dart';
 import '../shared/kantu_app_bar.dart';
 import '../shared/stat_card.dart';
 import '../shared/ventas_bar_chart.dart';
+import 'crm/tienda_crm_screen.dart';
 import 'tiendas_empresa_screen.dart';
 
 /// CU-10 — Dashboard de gestión de tienda.
@@ -149,6 +150,61 @@ class _DashboardEmpresaScreenState extends State<DashboardEmpresaScreen> {
 
               VentasBarChart(ventas: resumen.graficoVentas),
               const SizedBox(height: 20),
+
+              // Banner Acceso Directo Micro-CRM (CU-15)
+              if (tiendaService.tiendas.isNotEmpty) ...[
+                Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TiendaCrmScreen(tienda: tiendaService.tiendas.first),
+                      ),
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: KantuColors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: KantuColors.primaryLight,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.people_alt_outlined, color: KantuColors.primary, size: 24),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Cartera de Clientes & Micro-CRM',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: KantuColors.textPrimary),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Segmentación, LTV acumulado y bitácora comercial',
+                                  style: TextStyle(fontSize: 12, color: KantuColors.textSecondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios, size: 14, color: KantuColors.textMuted),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
             ],
 
             Row(

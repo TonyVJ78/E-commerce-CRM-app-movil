@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/colors.dart';
@@ -6,9 +6,21 @@ import '../../core/models/pedido.dart';
 import '../../core/services/pedidos_service.dart';
 
 /// Modal BottomSheet para la trazabilidad y seguimiento en tiempo real del pedido (CU-20)
-/// y el registro de calificaciones con estrellas táctiles nativas (CU-21).
+/// y el registro de calificaciones con estrellas tÃ¡ctiles nativas (CU-21).
 class SeguimientoPedidoSheet extends StatefulWidget {
   const SeguimientoPedidoSheet({super.key, required this.pedido});
+
+  SeguimientoPedidoSheet.porId({
+    super.key,
+    required int pedidoId,
+  }) : pedido = Pedido(
+          id: pedidoId,
+          clienteId: 0,
+          tiendaId: 0,
+          fecha: '',
+          subtotal: 0.0,
+          total: 0.0,
+        );
 
   final Pedido pedido;
 
@@ -65,7 +77,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
     } catch (error) {
       if (!mounted) return;
 
-      // Resiliencia ante errores HTTP 404 o caídas de red:
+      // Resiliencia ante errores HTTP 404 o caÃ­das de red:
       // Si la carga inicial falla, cerramos el bottomsheet de forma segura y regresamos
       // a la lista principal desplegando un SnackBar descriptivo sin provocar crashes.
       Navigator.of(context).pop();
@@ -77,7 +89,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
 
       final mensaje = is404
           ? 'El pedido #${widget.pedido.id} no fue encontrado o no tienes permiso para verlo.'
-          : 'Error de conexión al consultar el pedido #${widget.pedido.id}. Revisa tu conexión.';
+          : 'Error de conexiÃ³n al consultar el pedido #${widget.pedido.id}. Revisa tu conexiÃ³n.';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -133,7 +145,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
       if (mounted) {
         setState(() {
           _guardando = false;
-          _mensaje = '¡Tu calificación fue registrada exitosamente!';
+          _mensaje = 'Â¡Tu calificaciÃ³n fue registrada exitosamente!';
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -142,7 +154,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
               children: [
                 Icon(Icons.check_circle_rounded, color: Colors.white),
                 SizedBox(width: 12),
-                Text('¡Calificación guardada correctamente!'),
+                Text('Â¡CalificaciÃ³n guardada correctamente!'),
               ],
             ),
             backgroundColor: KantuColors.success,
@@ -253,7 +265,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
     final mes = fecha.month.toString().padLeft(2, '0');
     final hora = fecha.hour.toString().padLeft(2, '0');
     final minuto = fecha.minute.toString().padLeft(2, '0');
-    return '$dia/$mes/${fecha.year} · $hora:$minuto';
+    return '$dia/$mes/${fecha.year} Â· $hora:$minuto';
   }
 
   @override
@@ -422,7 +434,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   const Text(
-                    'Método de Pago',
+                    'MÃ©todo de Pago',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -446,7 +458,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
 
         const SizedBox(height: 22),
 
-        // Lista de Ítems
+        // Lista de Ãtems
         const Text(
           'Productos Adquiridos',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
@@ -483,7 +495,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                     ),
                     Text(
-                      '${item['variante_nombre'] ?? ''} · ${item['cantidad'] ?? 0} unid.',
+                      '${item['variante_nombre'] ?? ''} Â· ${item['cantidad'] ?? 0} unid.',
                       style: const TextStyle(color: KantuColors.textSecondary, fontSize: 12),
                     ),
                   ],
@@ -505,7 +517,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
             Icon(Icons.timeline_rounded, color: KantuColors.primary, size: 20),
             SizedBox(width: 8),
             Text(
-              'Línea de Tiempo de Seguimiento',
+              'LÃ­nea de Tiempo de Seguimiento',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
           ],
@@ -519,7 +531,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Text(
-              'No hay registros históricos para este pedido aún.',
+              'No hay registros histÃ³ricos para este pedido aÃºn.',
               style: TextStyle(color: KantuColors.textSecondary),
             ),
           )
@@ -530,7 +542,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
             return _timelineItem(evento, esUltimo: esUltimo);
           }),
 
-        // Sección de Reseñas y Calificación Táctil (CU-21)
+        // SecciÃ³n de ReseÃ±as y CalificaciÃ³n TÃ¡ctil (CU-21)
         const SizedBox(height: 28),
         const Divider(height: 1),
         const SizedBox(height: 20),
@@ -548,17 +560,17 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Comparte tu opinión sobre el producto y la tienda para ayudar a la comunidad.',
+            'Comparte tu opiniÃ³n sobre el producto y la tienda para ayudar a la comunidad.',
             style: TextStyle(fontSize: 12, color: KantuColors.textSecondary),
           ),
           const SizedBox(height: 14),
 
-          // Selector de Tipo de Reseña (Producto vs Tienda)
+          // Selector de Tipo de ReseÃ±a (Producto vs Tienda)
           Row(
             children: [
               Expanded(
                 child: ChoiceChip(
-                  label: const Center(child: Text('🏷️ Producto')),
+                  label: const Center(child: Text('ðŸ·ï¸ Producto')),
                   selected: _tipo == 'producto',
                   selectedColor: KantuColors.primaryLight,
                   onSelected: (val) => setState(() => _tipo = 'producto'),
@@ -567,7 +579,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
               const SizedBox(width: 10),
               Expanded(
                 child: ChoiceChip(
-                  label: const Center(child: Text('🏬 Tienda')),
+                  label: const Center(child: Text('ðŸ¬ Tienda')),
                   selected: _tipo == 'tienda',
                   selectedColor: KantuColors.primaryLight,
                   onSelected: (val) => setState(() => _tipo = 'tienda'),
@@ -604,7 +616,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
             const SizedBox(height: 14),
           ],
 
-          // Componente Nativo Táctil de 5 Estrellas
+          // Componente Nativo TÃ¡ctil de 5 Estrellas
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: BoxDecoration(
@@ -615,7 +627,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
             child: Column(
               children: [
                 const Text(
-                  'Tu Puntuación',
+                  'Tu PuntuaciÃ³n',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                 ),
                 const SizedBox(height: 8),
@@ -640,7 +652,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
             maxLength: 500,
             maxLines: 3,
             decoration: InputDecoration(
-              labelText: 'Cuéntanos tu experiencia (opcional)',
+              labelText: 'CuÃ©ntanos tu experiencia (opcional)',
               alignLabelWithHint: true,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               contentPadding: const EdgeInsets.all(14),
@@ -648,7 +660,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
           ),
           const SizedBox(height: 10),
 
-          // Botón Guardar
+          // BotÃ³n Guardar
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -665,15 +677,15 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.rate_review_rounded),
-              label: Text(_guardando ? 'Guardando reseña...' : 'Publicar Calificación'),
+              label: Text(_guardando ? 'Guardando reseÃ±a...' : 'Publicar CalificaciÃ³n'),
             ),
           ),
 
-          // Reseñas existentes
+          // ReseÃ±as existentes
           if (_resenas.isNotEmpty) ...[
             const SizedBox(height: 24),
             const Text(
-              'Reseñas registradas en este pedido:',
+              'ReseÃ±as registradas en este pedido:',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
@@ -693,7 +705,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Las calificaciones y reseñas estarán disponibles cuando tu pedido haya sido completado o entregado.',
+                    'Las calificaciones y reseÃ±as estarÃ¡n disponibles cuando tu pedido haya sido completado o entregado.',
                     style: TextStyle(fontSize: 13, color: KantuColors.textSecondary),
                   ),
                 ),
@@ -734,16 +746,16 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
   String _descripcionEstrellas(int calificacion) {
     switch (calificacion) {
       case 5:
-        return '5 / 5 — ¡Excelente experiencia!';
+        return '5 / 5 â€” Â¡Excelente experiencia!';
       case 4:
-        return '4 / 5 — Muy bueno';
+        return '4 / 5 â€” Muy bueno';
       case 3:
-        return '3 / 5 — Regular / Aceptable';
+        return '3 / 5 â€” Regular / Aceptable';
       case 2:
-        return '2 / 5 — Mejorable';
+        return '2 / 5 â€” Mejorable';
       case 1:
       default:
-        return '1 / 5 — Mala experiencia';
+        return '1 / 5 â€” Mala experiencia';
     }
   }
 
@@ -756,7 +768,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Columna de nodos y línea vertical conectora
+          // Columna de nodos y lÃ­nea vertical conectora
           Column(
             children: [
               Container(
@@ -870,7 +882,7 @@ class _SeguimientoPedidoSheetState extends State<SeguimientoPedidoSheet> {
             children: [
               Expanded(
                 child: Text(
-                  esTienda ? '🏬 Tienda · $nombre' : '🏷️ Producto · $nombre',
+                  esTienda ? 'ðŸ¬ Tienda Â· $nombre' : 'ðŸ·ï¸ Producto Â· $nombre',
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                   overflow: TextOverflow.ellipsis,
                 ),

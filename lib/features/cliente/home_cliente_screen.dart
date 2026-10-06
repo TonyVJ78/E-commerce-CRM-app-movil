@@ -12,7 +12,13 @@ import '../shared/kantu_app_bar.dart';
 import '../shared/kantu_search_field.dart';
 import '../shared/producto_imagen.dart';
 import 'chatbot_screen.dart';
+import '../../core/services/recommendation_service.dart';
 import 'producto_detail_sheet.dart';
+import '../../core/models/tienda.dart';
+import '../../core/theme/dynamic_theme_provider.dart';
+import '../tienda/tienda_header_widget.dart';
+import 'filtro_catalogo_sheet.dart';
+import 'recomendaciones_section.dart';
 
 /// Vitrina del cliente (CU-11). En modo servidor lee el catálogo público
 /// (`/api/catalogo/productos/`, con búsqueda y filtro del lado del servidor) y
@@ -44,14 +50,52 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
     super.dispose();
   }
 
-  Future<void> _abrirDetalle(Producto producto) {
-    return showModalBottomSheet(
+  Future<void> _abrirFiltros(CatalogoService catalogo) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => FiltroCatalogoSheet(catalogo: catalogo),
+    );
+  }
+
+  Future<void> _abrirDetalle(Producto producto) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ProductoDetailSheet(producto: producto),
     );
+    if (mounted) {
+      final catalogo = context.read<CatalogoService>();
+      final tiendaId = catalogo.selectedTiendaId ??
+          (catalogo.tiendas.isNotEmpty ? catalogo.tiendas.first.id : producto.tiendaId);
+      context.read<RecommendationService>().loadRecommendations(tiendaId);
+    }
   }
+  Tienda? _tiendaActiva(CatalogoService catalogo) {
+    final id = catalogo.selectedTiendaId;
+    if (id == null) return null;
+    for (final t in catalogo.tiendas) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
+  void _onSeleccionarTienda(int? tiendaId, CatalogoService catalogo) {
+    catalogo.setTienda(tiendaId);
+    if (tiendaId == null) {
+      context.read<DynamicThemeProvider>().resetToDefault();
+    } else {
+      for (final t in catalogo.tiendas) {
+        if (t.id == tiendaId) {
+          context.read<DynamicThemeProvider>().setStore(t);
+          break;
+        }
+      }
+    }
+  }
+
 
   /// Agregado rápido desde la tarjeta: sólo tiene sentido cuando no hay que
   /// elegir entre varias variantes; si las hay, se abre el detalle.
@@ -110,6 +154,17 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
         title: 'Kantu Market',
         showBackButton: false,
         actions: [
+          IconButton(
+            tooltip: 'Asistente IA',
+            icon: const Icon(Icons.auto_awesome, color: KantuColors.primary),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ChatbotScreen(),
+                ),
+              );
+            },
+          ),
           // Atajo al carrito con su total. La pestaña de abajo ya lleva el
           // contador, así que aquí basta un botón discreto y no un FAB que
           // tape la última fila de productos.
@@ -145,21 +200,74 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                   _HeroBanner(nombre: auth.currentUser?.firstName ?? 'Cliente'),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: KantuSearchField(
-                      controller: _searchController,
-                      hint: 'Buscar textiles, artesanías, café...',
-                      // Sólo al enviar: en modo servidor buscar por tecla sería
-                      // una petición por carácter.
-                      onSubmitted: catalogo.setSearch,
-                      onChanged: (valor) {
-                        setState(() {});
-                        if (valor.isEmpty) catalogo.setSearch('');
-                      },
-                      onLimpiar: () {
-                        _searchController.clear();
-                        catalogo.setSearch('');
-                        setState(() {});
-                      },
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: KantuSearchField(
+                            controller: _searchController,
+                            hint: 'Buscar textiles, artesanías, café...',
+                            onSubmitted: catalogo.setSearch,
+                            onChanged: (valor) {
+                              setState(() {});
+                              if (valor.isEmpty) catalogo.setSearch('');
+                            },
+                            onLimpiar: () {
+                              _searchController.clear();
+                              catalogo.setSearch('');
+                              setState(() {});
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            IconButton.filledTonal(
+                              style: IconButton.styleFrom(
+                                backgroundColor: catalogo.cantidadFiltrosAvanzados > 0
+                                    ? KantuColors.primaryLight
+                                    : Colors.white,
+                                foregroundColor: catalogo.cantidadFiltrosAvanzados > 0
+                                    ? KantuColors.primary
+                                    : KantuColors.textPrimary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  side: BorderSide(
+                                    color: catalogo.cantidadFiltrosAvanzados > 0
+                                        ? KantuColors.primary
+                                        : KantuColors.border,
+                                  ),
+                                ),
+                              ),
+                              tooltip: 'Filtros avanzados',
+                              icon: const Icon(Icons.tune, size: 20),
+                              onPressed: () => _abrirFiltros(catalogo),
+                            ),
+                            if (catalogo.cantidadFiltrosAvanzados > 0)
+                              Positioned(
+                                right: -4,
+                                top: -4,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: KantuColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                  child: Text(
+                                    '${catalogo.cantidadFiltrosAvanzados}',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -170,7 +278,7 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                     FiltroTiendas(
                       tiendas: catalogo.tiendas,
                       seleccionada: catalogo.selectedTiendaId,
-                      onSeleccionar: catalogo.setTienda,
+                      onSeleccionar: (id) => _onSeleccionarTienda(id, catalogo),
                     ),
                     const SizedBox(height: 14),
                   ],
@@ -234,6 +342,7 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                             onPressed: () {
                               _searchController.clear();
                               catalogo.limpiarFiltrosVitrina();
+                              context.read<DynamicThemeProvider>().resetToDefault();
                               setState(() {});
                             },
                             style: TextButton.styleFrom(
@@ -251,6 +360,30 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
+
+                  if (_tiendaActiva(catalogo) != null) ...[
+                    TiendaHeaderWidget(
+                      tienda: _tiendaActiva(catalogo)!,
+                      onCerrarFiltro: () {
+                        catalogo.setTienda(null);
+                        context.read<DynamicThemeProvider>().resetToDefault();
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+
+                  if (catalogo.selectedTiendaId != null)
+                    RecomendacionesSection(
+                      key: ValueKey('recommendations-${catalogo.selectedTiendaId}'),
+                      tiendaId: catalogo.selectedTiendaId!,
+                      onProductTap: _abrirDetalle,
+                    )
+                  else if (catalogo.tiendas.isNotEmpty)
+                    RecomendacionesSection(
+                      key: ValueKey('recommendations-${catalogo.tiendas.first.id}'),
+                      tiendaId: catalogo.tiendas.first.id,
+                      onProductTap: _abrirDetalle,
+                    ),
                 ],
               ),
             ),

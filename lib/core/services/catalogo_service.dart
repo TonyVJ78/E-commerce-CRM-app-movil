@@ -40,6 +40,10 @@ class CatalogoService extends ChangeNotifier {
   int? _selectedTiendaId;
   int? _selectedCategoriaId;
   String _searchQuery = '';
+  double? _precioMin;
+  double? _precioMax;
+  bool _enStock = false;
+  String _orden = 'recientes';
   bool _isLoading = false;
   bool _incluirInactivos = false;
   String? _errorMessage;
@@ -49,6 +53,10 @@ class CatalogoService extends ChangeNotifier {
   List<Tienda> get tiendas => _tiendas;
   int? get selectedTiendaId => _selectedTiendaId;
   int? get selectedCategoriaId => _selectedCategoriaId;
+  double? get precioMin => _precioMin;
+  double? get precioMax => _precioMax;
+  bool get enStock => _enStock;
+  String get orden => _orden;
 
   /// Nombre de la tienda filtrada, para que la vitrina pueda decir qué se está
   /// viendo sin volver a buscar en la lista.
@@ -72,7 +80,22 @@ class CatalogoService extends ChangeNotifier {
   }
 
   bool get hayFiltrosActivos =>
-      _selectedTiendaId != null || _selectedCategoriaId != null || _searchQuery.trim().isNotEmpty;
+      _selectedTiendaId != null ||
+      _selectedCategoriaId != null ||
+      _searchQuery.trim().isNotEmpty ||
+      _precioMin != null ||
+      _precioMax != null ||
+      _enStock ||
+      _orden != 'recientes';
+
+  int get cantidadFiltrosAvanzados {
+    int c = 0;
+    if (_precioMin != null || _precioMax != null) c++;
+    if (_enStock) c++;
+    if (_orden != 'recientes') c++;
+    return c;
+  }
+
   String get searchQuery => _searchQuery;
   bool get isLoading => _isLoading;
   bool get incluirInactivos => _incluirInactivos;
@@ -125,10 +148,12 @@ class CatalogoService extends ChangeNotifier {
       _categorias = await DatabaseHelper.instance.getCategorias(tiendaId: tiendaEfectiva);
       _productos = await DatabaseHelper.instance.getProductos(
         tiendaId: tiendaEfectiva,
-        // Igual que en remoto: con tienda fija vale el id; sin ella se filtra
-        // después por nombre, ya abajo.
         categoriaId: tiendaEfectiva != null ? _selectedCategoriaId : null,
         search: _searchQuery,
+        precioMin: _precioMin,
+        precioMax: _precioMax,
+        enStock: _enStock,
+        orden: _orden,
       );
 
       final nombreCategoria = selectedCategoriaNombre;
@@ -193,6 +218,10 @@ class CatalogoService extends ChangeNotifier {
             if (_selectedCategoriaId != null && tiendaId == null && categoriaNombre != null)
               'categoria_nombre': categoriaNombre,
             if (_searchQuery.trim().isNotEmpty) 'q': _searchQuery.trim(),
+            if (_precioMin != null) 'precio_min': '$_precioMin',
+            if (_precioMax != null) 'precio_max': '$_precioMax',
+            if (_enStock) 'en_stock': 'true',
+            if (_orden != 'recientes') 'orden': _orden,
           },
         ),
       ]);
@@ -335,10 +364,27 @@ class CatalogoService extends ChangeNotifier {
     loadCatalogoEmpresa(tiendaId);
   }
 
+  void setFiltrosAvanzados({
+    double? precioMin,
+    double? precioMax,
+    bool? enStock,
+    String? orden,
+  }) {
+    _precioMin = precioMin;
+    _precioMax = precioMax;
+    if (enStock != null) _enStock = enStock;
+    if (orden != null) _orden = orden;
+    loadCatalogo();
+  }
+
   void limpiarFiltros() {
     _selectedTiendaId = null;
     _selectedCategoriaId = null;
     _searchQuery = '';
+    _precioMin = null;
+    _precioMax = null;
+    _enStock = false;
+    _orden = 'recientes';
     _incluirInactivos = false;
     _errorMessage = null;
   }
@@ -349,6 +395,10 @@ class CatalogoService extends ChangeNotifier {
     _selectedTiendaId = null;
     _selectedCategoriaId = null;
     _searchQuery = '';
+    _precioMin = null;
+    _precioMax = null;
+    _enStock = false;
+    _orden = 'recientes';
     loadCatalogo();
   }
 

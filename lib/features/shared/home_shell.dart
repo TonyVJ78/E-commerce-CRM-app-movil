@@ -1,3 +1,4 @@
+﻿import '../../core/services/push_notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -14,8 +15,8 @@ import '../empresa/dashboard_empresa_screen.dart';
 import '../empresa/tiendas_empresa_screen.dart';
 import '../profile/profile_screen.dart';
 
-/// Da acceso al shell desde cualquier pantalla de una pestaña, para poder
-/// saltar a otra (p. ej. el carrito vacío que invita a volver al catálogo).
+/// Da acceso al shell desde cualquier pantalla de una pestaÃ±a, para poder
+/// saltar a otra (p. ej. el carrito vacÃ­o que invita a volver al catÃ¡logo).
 class HomeShellScope extends InheritedWidget {
   final int indice;
   final void Function(int) irATab;
@@ -48,9 +49,9 @@ class _Pestania {
   });
 }
 
-/// Contenedor principal tras el login. Las pestañas dependen del rol, igual que
-/// el routing por rol del frontend Angular (`cliente` → inicio, `empresa` →
-/// tiendas, `administrador` → dashboard).
+/// Contenedor principal tras el login. Las pestaÃ±as dependen del rol, igual que
+/// el routing por rol del frontend Angular (`cliente` â†’ inicio, `empresa` â†’
+/// tiendas, `administrador` â†’ dashboard).
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -61,10 +62,29 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _indice = 0;
 
-  /// Pestañas por rol:
-  /// - empresa → panel (CU-10), tiendas y su catálogo (CU-08 y CU-09), ventas
-  /// - cliente → vitrina y carrito (CU-11), pedidos
-  /// - administrador → métricas, usuarios y auditoría (CU-07)
+  @override
+  void initState() {
+    super.initState();
+    PushNotificationService.tabChangeNotifier.addListener(_onTabChangeRequested);
+  }
+
+  @override
+  void dispose() {
+    PushNotificationService.tabChangeNotifier.removeListener(_onTabChangeRequested);
+    super.dispose();
+  }
+
+  void _onTabChangeRequested() {
+    final nuevoIndice = PushNotificationService.tabChangeNotifier.value;
+    if (nuevoIndice != null && mounted) {
+      setState(() => _indice = nuevoIndice);
+    }
+  }
+
+  /// PestaÃ±as por rol:
+  /// - empresa â†’ panel (CU-10), tiendas y su catÃ¡logo (CU-08 y CU-09), ventas
+  /// - cliente â†’ vitrina y carrito (CU-11), pedidos
+  /// - administrador â†’ mÃ©tricas, usuarios y auditorÃ­a (CU-07)
   List<_Pestania> _pestanias(String rol) {
     switch (rol) {
       case 'empresa':
@@ -110,7 +130,7 @@ class _HomeShellState extends State<HomeShell> {
             pantalla: UsuariosManagementScreen(),
           ),
           _Pestania(
-            etiqueta: 'Auditoría',
+            etiqueta: 'AuditorÃ­a',
             icono: Icons.fact_check_outlined,
             iconoActivo: Icons.fact_check,
             pantalla: AuditoriaScreen(),
@@ -164,8 +184,8 @@ class _HomeShellState extends State<HomeShell> {
     final rol = auth.currentUser?.rol ?? 'cliente';
     final pestanias = _pestanias(rol);
 
-    // Cambiar de rol (cerrar sesión y entrar con otra cuenta) puede dejar el
-    // índice fuera de rango si el rol nuevo tiene menos pestañas.
+    // Cambiar de rol (cerrar sesiÃ³n y entrar con otra cuenta) puede dejar el
+    // Ã­ndice fuera de rango si el rol nuevo tiene menos pestaÃ±as.
     final indiceValido = _indice.clamp(0, pestanias.length - 1);
 
     return HomeShellScope(
@@ -203,7 +223,7 @@ class _BarraInferior extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Sólo el cliente tiene pestaña de carrito, y es la única con contador.
+    // SÃ³lo el cliente tiene pestaÃ±a de carrito, y es la Ãºnica con contador.
     final cantidadCarrito = esCliente ? context.watch<CartService>().itemCount : 0;
 
     return Container(
