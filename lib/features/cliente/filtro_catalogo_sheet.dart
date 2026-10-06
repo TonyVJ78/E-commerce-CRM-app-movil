@@ -210,7 +210,7 @@ class _FiltroCatalogoSheetState extends State<FiltroCatalogoSheet> {
                 'Ocultar productos agotados temporalmente',
                 style: TextStyle(fontSize: 12, color: KantuColors.textMuted),
               ),
-              activeColor: KantuColors.primary,
+              activeTrackColor: KantuColors.primary,
               value: _enStock,
               onChanged: (val) => setState(() => _enStock = val),
             ),
