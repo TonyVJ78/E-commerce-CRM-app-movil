@@ -623,6 +623,10 @@ class DatabaseHelper {
     int? tiendaId,
     int? categoriaId,
     String? search,
+    double? precioMin,
+    double? precioMax,
+    bool enStock = false,
+    String orden = 'recientes',
     bool soloActivos = true,
   }) async {
     final db = await database;
@@ -654,12 +658,36 @@ class DatabaseHelper {
 
     final variantesPorProducto = await _variantesDe(filas.map((f) => f['id'] as int).toList());
 
-    return filas
+    var lista = filas
         .map((fila) => Producto.fromMap(
               fila,
               variantes: variantesPorProducto[fila['id'] as int] ?? const [],
             ))
         .toList();
+
+    // Filtros sobre variantes (precio y stock)
+    if (enStock) {
+      lista = lista.where((p) => p.stockTotal > 0).toList();
+    }
+    if (precioMin != null) {
+      lista = lista.where((p) => p.precioBase >= precioMin).toList();
+    }
+    if (precioMax != null) {
+      lista = lista.where((p) => p.precioBase <= precioMax).toList();
+    }
+
+    // Ordenamiento local
+    if (orden == 'precio_asc') {
+      lista.sort((a, b) => a.precioBase.compareTo(b.precioBase));
+    } else if (orden == 'precio_desc') {
+      lista.sort((a, b) => b.precioBase.compareTo(a.precioBase));
+    } else if (orden == 'nombre_asc') {
+      lista.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+    } else if (orden == 'nombre_desc') {
+      lista.sort((a, b) => b.nombre.toLowerCase().compareTo(a.nombre.toLowerCase()));
+    }
+
+    return lista;
   }
 
   Future<Map<int, List<Variante>>> _variantesDe(List<int> productoIds) async {

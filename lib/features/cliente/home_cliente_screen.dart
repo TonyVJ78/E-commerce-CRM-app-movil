@@ -17,6 +17,7 @@ import '../../core/models/tienda.dart';
 import '../../core/theme/dynamic_theme_provider.dart';
 import '../tienda/tienda_header_widget.dart';
 import 'chatbot_screen.dart';
+import 'filtro_catalogo_sheet.dart';
 import 'recomendaciones_section.dart';
 
 /// Vitrina del cliente (CU-11). En modo servidor lee el catálogo público
@@ -47,6 +48,15 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _abrirFiltros(CatalogoService catalogo) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => FiltroCatalogoSheet(catalogo: catalogo),
+    );
   }
 
   Future<void> _abrirDetalle(Producto producto) async {
@@ -178,21 +188,74 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                   _HeroBanner(nombre: auth.currentUser?.firstName ?? 'Cliente'),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: KantuSearchField(
-                      controller: _searchController,
-                      hint: 'Buscar textiles, artesanías, café...',
-                      // Sólo al enviar: en modo servidor buscar por tecla sería
-                      // una petición por carácter.
-                      onSubmitted: catalogo.setSearch,
-                      onChanged: (valor) {
-                        setState(() {});
-                        if (valor.isEmpty) catalogo.setSearch('');
-                      },
-                      onLimpiar: () {
-                        _searchController.clear();
-                        catalogo.setSearch('');
-                        setState(() {});
-                      },
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: KantuSearchField(
+                            controller: _searchController,
+                            hint: 'Buscar textiles, artesanías, café...',
+                            onSubmitted: catalogo.setSearch,
+                            onChanged: (valor) {
+                              setState(() {});
+                              if (valor.isEmpty) catalogo.setSearch('');
+                            },
+                            onLimpiar: () {
+                              _searchController.clear();
+                              catalogo.setSearch('');
+                              setState(() {});
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            IconButton.filledTonal(
+                              style: IconButton.styleFrom(
+                                backgroundColor: catalogo.cantidadFiltrosAvanzados > 0
+                                    ? KantuColors.primaryLight
+                                    : Colors.white,
+                                foregroundColor: catalogo.cantidadFiltrosAvanzados > 0
+                                    ? KantuColors.primary
+                                    : KantuColors.textPrimary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  side: BorderSide(
+                                    color: catalogo.cantidadFiltrosAvanzados > 0
+                                        ? KantuColors.primary
+                                        : KantuColors.border,
+                                  ),
+                                ),
+                              ),
+                              tooltip: 'Filtros avanzados',
+                              icon: const Icon(Icons.tune, size: 20),
+                              onPressed: () => _abrirFiltros(catalogo),
+                            ),
+                            if (catalogo.cantidadFiltrosAvanzados > 0)
+                              Positioned(
+                                right: -4,
+                                top: -4,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(
+                                    color: KantuColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                  child: Text(
+                                    '${catalogo.cantidadFiltrosAvanzados}',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),
