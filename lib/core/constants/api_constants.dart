@@ -77,6 +77,13 @@ class ApiConstants {
   // --- Chatbot Asistente IA (en cuarentena para endpoint backend futuro) ---
   static const String chatbot = '/ia/chatbot/';
 
+  // --- Informes de tienda con IA (CU-34) ---
+  static const String informes = '/ia/informes/';
+  static const String informesContexto = '/ia/informes/contexto/';
+  static const String informesGenerar = '/ia/informes/generar/';
+  static String informeDetalle(int id) => '/ia/informes/$id/';
+  static String informeExportar(int id) => '/ia/informes/$id/exportar/';
+
   // --- Notificaciones Push en Vivo (CU-18) ---
   static const String registrarDispositivo = '/usuarios/dispositivos/';
 

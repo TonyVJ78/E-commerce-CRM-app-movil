@@ -13,6 +13,7 @@ import '../cliente/home_cliente_screen.dart';
 import '../cliente/pedidos_screen.dart';
 import '../empresa/dashboard_empresa_screen.dart';
 import '../empresa/tiendas_empresa_screen.dart';
+import '../informes/informes_screen.dart';
 import '../profile/profile_screen.dart';
 
 /// Da acceso al shell desde cualquier pantalla de una pestaÃ±a, para poder
@@ -108,6 +109,12 @@ class _HomeShellState extends State<HomeShell> {
             pantalla: PedidosScreen(modoEmpresa: true),
           ),
           _Pestania(
+            etiqueta: 'Informes',
+            icono: Icons.query_stats_outlined,
+            iconoActivo: Icons.query_stats,
+            pantalla: InformesScreen(),
+          ),
+          _Pestania(
             etiqueta: 'Perfil',
             icono: Icons.person_outline,
             iconoActivo: Icons.person,
@@ -134,6 +141,12 @@ class _HomeShellState extends State<HomeShell> {
             icono: Icons.fact_check_outlined,
             iconoActivo: Icons.fact_check,
             pantalla: AuditoriaScreen(),
+          ),
+          _Pestania(
+            etiqueta: 'Informes',
+            icono: Icons.query_stats_outlined,
+            iconoActivo: Icons.query_stats,
+            pantalla: InformesScreen(),
           ),
           _Pestania(
             etiqueta: 'Perfil',
