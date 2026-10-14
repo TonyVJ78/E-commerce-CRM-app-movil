@@ -65,6 +65,11 @@ class ApiConstants {
       '/pedidos/mis-pedidos/$pedidoId/';
   static String resenasPedido(int pedidoId) =>
       '/pedidos/mis-pedidos/$pedidoId/resenas/';
+  // CU-33: factura en PDF del pedido (descarga y reenvío al correo).
+  static String reciboPedido(int pedidoId) =>
+      '/pedidos/mis-pedidos/$pedidoId/recibo/';
+  static String reenviarReciboPedido(int pedidoId) =>
+      '/pedidos/mis-pedidos/$pedidoId/recibo/enviar/';
   static String pedidosTienda(int tiendaId) =>
       '/tiendas/$tiendaId/pedidos/';
 

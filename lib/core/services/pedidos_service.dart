@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path_provider/path_provider.dart';
+
 import '../constants/api_constants.dart';
 import 'api_service.dart';
 
@@ -82,6 +84,52 @@ class PedidosService {
       );
     } catch (e) {
       rethrow;
+    }
+  }
+
+  /// CU-33: descarga la factura en PDF del pedido
+  /// (`GET /api/pedidos/mis-pedidos/{pedidoId}/recibo/`) a la carpeta temporal
+  /// y devuelve la ruta local, lista para abrir o compartir.
+  Future<String> descargarRecibo(int pedidoId) async {
+    try {
+      final response = await ApiService.instance.get(
+        ApiConstants.reciboPedido(pedidoId),
+        auth: true,
+      );
+      if (response.statusCode == 404) {
+        throw PedidoNotFoundException(pedidoId, 'La factura del pedido #$pedidoId no está disponible.');
+      }
+      if (response.statusCode != 200) {
+        throw Exception('No se pudo descargar la factura (HTTP ${response.statusCode}).');
+      }
+      final carpeta = await getTemporaryDirectory();
+      final archivo = File('${carpeta.path}/factura-kantu-${pedidoId.toString().padLeft(8, '0')}.pdf');
+      await archivo.writeAsBytes(response.bodyBytes, flush: true);
+      return archivo.path;
+    } on SocketException catch (_) {
+      throw const SocketException(
+        'No se pudo conectar con el servidor. Revisa tu conexión a internet.',
+      );
+    }
+  }
+
+  /// CU-33: reenvía la factura al correo de la cuenta
+  /// (`POST /api/pedidos/mis-pedidos/{pedidoId}/recibo/enviar/`).
+  /// Devuelve el mensaje de confirmación del backend.
+  Future<String> reenviarRecibo(int pedidoId) async {
+    try {
+      final response = await ApiService.instance.post(
+        ApiConstants.reenviarReciboPedido(pedidoId),
+        {},
+        auth: true,
+        timeout: const Duration(seconds: 40),
+      );
+      final data = _decodificar(response.statusCode, response.body);
+      return data['mensaje']?.toString() ?? 'Enviamos la factura a tu correo.';
+    } on SocketException catch (_) {
+      throw const SocketException(
+        'No se pudo conectar con el servidor. Revisa tu conexión a internet.',
+      );
     }
   }
 

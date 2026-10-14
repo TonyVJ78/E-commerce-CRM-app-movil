@@ -35,6 +35,18 @@ class CartService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  /// CU-33: resultado del envío de la factura en la última compra hecha contra
+  /// el backend. `null` si la compra fue en modo autónomo (no hay factura).
+  bool? _ultimoReciboEnviado;
+  String _ultimoReciboEmail = '';
+  bool? get ultimoReciboEnviado => _ultimoReciboEnviado;
+  String get ultimoReciboEmail => _ultimoReciboEmail;
+
+  /// El checkout manda la factura por correo antes de responder (hasta
+  /// `EMAIL_TIMEOUT` = 15 s en el backend): con el timeout general de 20 s la
+  /// app podría dar por fallida una compra que sí se registró.
+  static const Duration _timeoutCheckout = Duration(seconds: 45);
+
   bool get _online => ApiService.instance.useOnlineBackend;
 
   /// Ítems agrupados por tienda, en el mismo orden en que se agregaron.
@@ -347,16 +359,22 @@ class CartService extends ChangeNotifier {
   // Checkout y pedidos
   // =========================================================================
 
-  /// Confirma el pedido.
+  /// Confirma el pedido pagado con QR o en efectivo.
   ///
-  /// El backend todavía no expone un endpoint para crear pedidos desde el
-  /// carrito, así que el pedido se registra en la base local en ambos modos; en
-  /// modo servidor además se vacía el carrito remoto.
+  /// En modo servidor va a `POST /pedidos/carrito/checkout/` como la web: el
+  /// pedido queda en el backend (y aparece en "Mis pedidos") y el cliente
+  /// recibe la factura por correo (CU-33). En modo autónomo se registra en
+  /// SQLite.
   Future<Pedido?> checkout({
     required Usuario cliente,
     required String metodoPago,
   }) async {
     if (_items.isEmpty) return null;
+    if (_online) {
+      final esQr = metodoPago.toLowerCase().startsWith('qr');
+      return _checkoutRemoto(cliente: cliente, cuerpo: {'metodo_pago': esQr ? 'qr' : 'efectivo'});
+    }
+    _ultimoReciboEnviado = null;
     // Descuenta el stock de las variantes registradas en CU-08.
     _isLoading = true;
     _clienteId = cliente.id;
@@ -436,17 +454,32 @@ class CartService extends ChangeNotifier {
   Future<Pedido?> checkoutStripeRemoto({
     required Usuario cliente,
     required String paymentIntentId,
+  }) {
+    return _checkoutRemoto(
+      cliente: cliente,
+      cuerpo: {'metodo_pago': 'stripe', 'payment_intent_id': paymentIntentId},
+    );
+  }
+
+  /// `POST /pedidos/carrito/checkout/`: un pedido por tienda del carrito.
+  /// Devuelve el primero, que es el que se muestra en la confirmación.
+  Future<Pedido?> _checkoutRemoto({
+    required Usuario cliente,
+    required Map<String, dynamic> cuerpo,
   }) async {
     if (_items.isEmpty) return null;
     _isLoading = true;
     _errorMessage = null;
+    _ultimoReciboEnviado = null;
     notifyListeners();
 
     try {
-      final res = await ApiService.instance.post(ApiConstants.carritoCheckout, {
-        'metodo_pago': 'stripe',
-        'payment_intent_id': paymentIntentId,
-      }, auth: true);
+      final res = await ApiService.instance.post(
+        ApiConstants.carritoCheckout,
+        cuerpo,
+        auth: true,
+        timeout: _timeoutCheckout,
+      );
 
       if (res.statusCode != 201) {
         _errorMessage = _mensajeError(res.body);
@@ -460,6 +493,8 @@ class CartService extends ChangeNotifier {
           .map((e) => _entero(e))
           .toList();
       final primerTiendaId = _items.first.producto.tiendaId;
+      _ultimoReciboEnviado = data['recibo_enviado'] == true;
+      _ultimoReciboEmail = data['recibo_email']?.toString() ?? cliente.email;
 
       final pedido = Pedido(
         id: idsPedidos.isNotEmpty ? idsPedidos.first : 0,
@@ -471,7 +506,7 @@ class CartService extends ChangeNotifier {
         fecha: DateTime.now().toIso8601String(),
         subtotal: totalAmount,
         total: totalAmount,
-        metodoPago: 'Tarjeta (Stripe)',
+        metodoPago: data['metodo_pago']?.toString() ?? '',
       );
 
       _items = [];

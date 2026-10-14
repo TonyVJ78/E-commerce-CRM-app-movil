@@ -386,6 +386,9 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _mostrarExito(int pedidoId) {
+    // CU-33: solo las compras hechas contra el backend generan factura.
+    final cart = context.read<CartService>();
+    final reciboEnviado = cart.ultimoReciboEnviado;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -413,6 +416,34 @@ class _CartScreenState extends State<CartScreen> {
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14, color: KantuColors.textSecondary),
             ),
+            if (reciboEnviado != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: reciboEnviado ? KantuColors.successLight : KantuColors.background,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      reciboEnviado ? Icons.mark_email_read_rounded : Icons.receipt_long_rounded,
+                      size: 20,
+                      color: reciboEnviado ? KantuColors.success : KantuColors.textSecondary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        reciboEnviado
+                            ? 'Te enviamos la factura a ${cart.ultimoReciboEmail}.'
+                            : 'No pudimos enviar la factura por correo. Puedes verla o reenviarla desde Mis pedidos.',
+                        style: const TextStyle(fontSize: 12.5, color: KantuColors.textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             CustomButton(
               text: 'Ver mis pedidos',
