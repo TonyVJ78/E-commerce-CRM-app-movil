@@ -28,13 +28,25 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> init() async {
+    _currentUser = null;
+    _errorMessage = null;
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString('km_user');
     if (userJson != null) {
-      try {
-        final map = jsonDecode(userJson);
-        _currentUser = Usuario.fromMap(map);
-      } catch (_) {}
+      // Una cuenta local guardada no autentica peticiones contra el servidor.
+      // Puede quedar de una instalación anterior que funcionaba con SQLite.
+      final requiereLogin = ApiService.instance.useOnlineBackend &&
+          ((await ApiService.instance.getAccessToken())?.trim().isEmpty ?? true) &&
+          ((await ApiService.instance.getRefreshToken())?.trim().isEmpty ?? true);
+      if (requiereLogin) {
+        await _clearUserFromStorage();
+        _errorMessage = 'Inicia sesión nuevamente para conectarte al servidor.';
+      } else {
+        try {
+          final map = jsonDecode(userJson);
+          _currentUser = Usuario.fromMap(map);
+        } catch (_) {}
+      }
     }
     _telefono = prefs.getString('km_user_telefono');
     _direccionEnvio = prefs.getString('km_user_direccion');
