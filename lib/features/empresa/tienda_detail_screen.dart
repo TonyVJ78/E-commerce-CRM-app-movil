@@ -10,6 +10,7 @@ import '../shared/kantu_app_bar.dart';
 import '../shared/kantu_search_field.dart';
 import '../shared/producto_imagen.dart';
 import 'crm/tienda_crm_screen.dart';
+import 'campana_carrito_screen.dart';
 import 'producto_form_screen.dart';
 
 /// Catálogo de una tienda desde el panel de la empresa.
@@ -133,6 +134,14 @@ class _TiendaDetailScreenState extends State<TiendaDetailScreen> {
       appBar: KantuAppBar(
         title: t.nombre,
         actions: [
+          IconButton(
+            tooltip: 'Carritos abandonados',
+            icon: const Icon(Icons.shopping_cart_checkout_outlined),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => CampanaCarritoScreen(tienda: t),
+            )),
+          ),
+
           IconButton(
             tooltip: 'Cartera de Clientes (Micro-CRM)',
             icon: const Icon(Icons.people_alt_outlined, color: KantuColors.textPrimary),

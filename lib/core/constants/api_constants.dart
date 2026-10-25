@@ -93,4 +93,9 @@ class ApiConstants {
   static const String misTickets = '/soporte/tickets/mis-tickets/';
   static String ticketSoporte(int id) => '/soporte/tickets/$id/';
   static String responderTicket(int id) => '/soporte/tickets/$id/responder/';
+
+  // CU-26: campañas y recuperación del carrito, aisladas por tienda.
+  static String campanaCarrito(int tiendaId) => '/tiendas/$tiendaId/campana-carrito/';
+  static String carritosAbandonados(int tiendaId) => '/tiendas/$tiendaId/carritos-abandonados/';
+  static String pruebaCampanaCarrito(int tiendaId) => '/tiendas/$tiendaId/campana-carrito/disparar-prueba/';
 }

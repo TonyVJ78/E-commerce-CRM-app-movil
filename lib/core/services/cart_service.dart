@@ -63,18 +63,25 @@ class CartService extends ChangeNotifier {
 
   Future<void> loadCarrito(Usuario? cliente) async {
     if (cliente == null) return;
+    if (_clienteId != cliente.id) {
+      _items = [];
+      _nombresTienda.clear();
+    }
     _clienteId = cliente.id;
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
-      if (_online && await _loadCarritoRemoto()) {
+      if (_online) {
+        await _loadCarritoRemoto();
         _isLoading = false;
         notifyListeners();
         return;
       }
       _items = await DatabaseHelper.instance.getItemsCarrito(cliente.id);
     } catch (e) {
+      if (_online) _items = [];
       _errorMessage = 'No se pudo cargar el carrito: $e';
     }
 
@@ -88,11 +95,11 @@ class CartService extends ChangeNotifier {
         ApiConstants.carrito,
         auth: true,
       );
-      if (res.statusCode != 200) return false;
+      if (res.statusCode != 200) throw Exception(_mensajeError(res.body));
 
       final data = jsonDecode(res.body);
       final carritos = data['carritos'];
-      if (carritos is! List) return false;
+      if (carritos is! List) throw const FormatException('Respuesta de carrito inválida.');
 
       final items = <ItemCarrito>[];
       for (final carrito in carritos) {
@@ -108,7 +115,7 @@ class CartService extends ChangeNotifier {
       _items = items;
       return true;
     } catch (_) {
-      return false;
+      rethrow;
     }
   }
 

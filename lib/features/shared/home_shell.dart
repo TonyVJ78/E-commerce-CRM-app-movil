@@ -66,6 +66,9 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     PushNotificationService.tabChangeNotifier.addListener(_onTabChangeRequested);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) PushNotificationService.instance.procesarCarritoPendiente();
+    });
   }
 
   @override
@@ -78,6 +81,7 @@ class _HomeShellState extends State<HomeShell> {
     final nuevoIndice = PushNotificationService.tabChangeNotifier.value;
     if (nuevoIndice != null && mounted) {
       setState(() => _indice = nuevoIndice);
+      PushNotificationService.tabChangeNotifier.value = null;
     }
   }
 

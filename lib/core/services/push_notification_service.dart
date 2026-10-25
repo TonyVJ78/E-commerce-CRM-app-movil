@@ -3,11 +3,14 @@ import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../features/cliente/seguimiento_pedido_sheet.dart';
 import '../constants/api_constants.dart';
 import '../constants/colors.dart';
 import 'api_service.dart';
+import 'auth_service.dart';
+import 'cart_service.dart';
 
 
 /// Manejador de notificaciones FCM en segundo plano o estado terminado.
@@ -43,6 +46,7 @@ class PushNotificationService {
       ValueNotifier<int?>(null);
 
   bool _initialized = false;
+  bool _carritoPendiente = false;
   bool get isInitialized => _initialized;
 
   String? _fcmToken;
@@ -162,7 +166,8 @@ class PushNotificationService {
         message.data['cuerpo'] ??
         message.data['mensaje'] ??
         'Tienes una nueva actualización.';
-    final pedidoId = extraerPedidoId(message.data) ??
+    final esCarrito = esRecuperacionCarrito(message.data);
+    final pedidoId = esCarrito ? null : extraerPedidoId(message.data) ??
         extraerPedidoIdDeTexto(notification?.title) ??
         extraerPedidoIdDeTexto(notification?.body);
 
@@ -227,7 +232,9 @@ class PushNotificationService {
             ),
           ],
         ),
-        action: pedidoId != null
+        action: esCarrito
+            ? SnackBarAction(label: 'VER CARRITO', onPressed: navegarAlCarrito)
+            : pedidoId != null
             ? SnackBarAction(
                 label: 'VER',
                 textColor: KantuColors.primaryLight,
@@ -241,6 +248,10 @@ class PushNotificationService {
   /// Maneja el toque en la notificación (desde background o terminated).
   void _manejarNotificacionTap(RemoteMessage message) {
     debugPrint('[FCM Tap] Notificación pulsada. Data: ${message.data}');
+    if (esRecuperacionCarrito(message.data)) {
+      navegarAlCarrito();
+      return;
+    }
     final pedidoId = extraerPedidoId(message.data) ??
         extraerPedidoIdDeTexto(message.notification?.title) ??
         extraerPedidoIdDeTexto(message.notification?.body);
@@ -286,6 +297,7 @@ class PushNotificationService {
   /// Extrae el ID del pedido desde los datos (payload) de la notificación FCM.
   static int? extraerPedidoId(Map<String, dynamic>? data) {
     if (data == null) return null;
+    if (esRecuperacionCarrito(data)) return null;
     final dynamic valor = data['pedido_id'] ??
         data['pedidoId'] ??
         data['order_id'] ??
@@ -303,5 +315,27 @@ class PushNotificationService {
       return int.tryParse(match.group(1)!);
     }
     return null;
+  }
+
+  static bool esRecuperacionCarrito(Map<String, dynamic>? data) =>
+      const {'carrito_abandonado', 'recuperacion_carrito', 'carrito'}
+          .contains(data?['tipo']?.toString().toLowerCase());
+
+  /// El carrito se obtiene de nuevo del servidor; no se reconstruye desde el payload.
+  Future<void> navegarAlCarrito() async {
+    _carritoPendiente = true;
+    final nav = navigatorKey.currentState;
+    final context = navigatorKey.currentContext;
+    if (nav == null || context == null) return;
+    final usuario = context.read<AuthService>().currentUser;
+    if (usuario == null || usuario.rol != 'cliente') return;
+    _carritoPendiente = false;
+    nav.popUntil((route) => route.isFirst);
+    tabChangeNotifier.value = 1;
+    await context.read<CartService>().loadCarrito(usuario);
+  }
+
+  void procesarCarritoPendiente() {
+    if (_carritoPendiente) unawaited(navegarAlCarrito());
   }
 }
