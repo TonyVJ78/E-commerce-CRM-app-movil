@@ -87,4 +87,10 @@ class ApiConstants {
       '/tiendas/$tiendaId/crm/clientes/$clienteId/';
   static String crmInteracciones(int tiendaId, int clienteId) =>
       '/tiendas/$tiendaId/crm/clientes/$clienteId/interacciones/';
+
+  // --- Consultas y reclamos del cliente (CU-25 / HU-084, Sprint 3) ---
+  static const String crearTicket = '/soporte/tickets/';
+  static const String misTickets = '/soporte/tickets/mis-tickets/';
+  static String ticketSoporte(int id) => '/soporte/tickets/$id/';
+  static String responderTicket(int id) => '/soporte/tickets/$id/responder/';
 }

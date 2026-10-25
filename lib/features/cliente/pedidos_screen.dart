@@ -7,6 +7,7 @@ import '../../core/services/auth_service.dart';
 import '../../core/services/cart_service.dart';
 import '../shared/kantu_app_bar.dart';
 import 'seguimiento_pedido_sheet.dart';
+import 'soporte_screen.dart';
 
 /// Pedidos confirmados, el paso siguiente al carrito de CU-11.
 ///
@@ -72,6 +73,15 @@ class _PedidosScreenState extends State<PedidosScreen> {
       appBar: KantuAppBar(
         title: widget.modoEmpresa ? 'Ventas Recibidas' : 'Mis Pedidos',
         showBackButton: false,
+        actions: widget.modoEmpresa ? null : [
+          IconButton(
+            tooltip: 'Consultas y reclamos',
+            icon: const Icon(Icons.support_agent_outlined),
+            onPressed: () => Navigator.of(context).push<void>(
+              MaterialPageRoute(builder: (_) => const SoporteScreen()),
+            ),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         color: KantuColors.primary,
@@ -308,6 +318,19 @@ class _TarjetaPedido extends StatelessWidget {
             ),
             if (!modoEmpresa) ...[
               const SizedBox(height: 12),
+              TextButton.icon(
+                icon: const Icon(Icons.support_agent_outlined),
+                label: const Text('Consulta o reclamo'),
+                onPressed: () async {
+                  final ticket = await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => NuevoTicketScreen(pedido: pedido)),
+                  );
+                  if (!context.mounted || ticket == null) return;
+                  Navigator.of(context).push<void>(MaterialPageRoute(
+                    builder: (_) => DetalleTicketScreen(ticketId: ticket.id),
+                  ));
+                },
+              ),
               const Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
