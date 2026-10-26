@@ -49,3 +49,9 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Firebase local configuration; never commit service accounts
+/config/firebase.local.json
+**/google-services.json
+**/GoogleService-Info.plist
+**/*firebase-adminsdk*.json

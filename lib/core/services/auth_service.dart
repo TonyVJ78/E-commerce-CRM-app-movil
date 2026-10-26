@@ -247,6 +247,7 @@ class AuthService extends ChangeNotifier {
 
   // --- LOGOUT (CU03: Cerrar sesión) ---
   Future<void> logout() async {
+    await PushNotificationService.instance.cerrarSesion();
     _isLoading = true;
     notifyListeners();
 

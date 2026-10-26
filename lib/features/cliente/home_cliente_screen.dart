@@ -18,6 +18,7 @@ import '../../core/theme/dynamic_theme_provider.dart';
 import '../tienda/tienda_header_widget.dart';
 import 'chatbot_screen.dart';
 import 'cupones_screen.dart';
+import 'notificaciones_screen.dart';
 import 'filtro_catalogo_sheet.dart';
 import 'recomendaciones_section.dart';
 
@@ -143,8 +144,14 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
         title: 'Kantu Market',
         showBackButton: false,
         actions: [
-          IconButton(tooltip: 'Mis promociones', icon: const Icon(Icons.local_offer_outlined),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CuponesScreen()))),
+          PopupMenuButton<String>(tooltip: 'Promociones y notificaciones',
+            icon: const Icon(Icons.notifications_outlined),
+            onSelected: (value) => Navigator.push(context, MaterialPageRoute(builder: (_) =>
+              value == 'avisos' ? const NotificacionesScreen() : const CuponesScreen())),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'avisos', child: Text('Mis notificaciones')),
+              PopupMenuItem(value: 'cupones', child: Text('Mis promociones')),
+            ]),
           IconButton(
             tooltip: 'Asistente IA',
             icon: const Icon(Icons.auto_awesome, color: KantuColors.primary),

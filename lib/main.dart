@@ -1,4 +1,4 @@
-import 'package:firebase_core/firebase_core.dart';
+import 'core/services/firebase_runtime.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -23,16 +23,8 @@ void main() async {
   final authService = AuthService();
   await authService.init();
 
-  // Inicialización de Firebase y Push Notification Service (CU-18)
-  // Regla Estricta: Manejo silencioso. Si la inicialización falla (p. ej. por falta de
-  // google-services.json local), se imprime el error en consola y la app arranca SIN crash.
-  try {
-    await Firebase.initializeApp();
+  if (await FirebaseRuntime.initialize()) {
     await PushNotificationService.instance.init();
-  } catch (e) {
-    debugPrint(
-      '[FCM] Inicialización de Firebase omitida o fallida (modo offline/resiliente): $e',
-    );
   }
 
   runApp(
