@@ -86,25 +86,48 @@ class InformesService extends ChangeNotifier {
     }
     _cargandoContexto = true;
     _errorContexto = null;
+    _sinPermiso = false;
     notifyListeners();
     try {
-      final res = await ApiService.instance.get(ApiConstants.informesContexto, auth: true);
+      final res = await ApiService.instance.get(
+        ApiConstants.informesContexto,
+        auth: true,
+      );
       if (res.statusCode == 200) {
-        _contexto = ContextoInformes.fromJson(_json(res.bodyBytes) as Map<String, dynamic>);
+        _contexto = ContextoInformes.fromJson(
+          _json(res.bodyBytes) as Map<String, dynamic>,
+        );
         _sinPermiso = false;
         final tiendas = _contexto!.tiendas;
         if (tiendas.length == 1) {
           _tiendaId = tiendas.first.id;
-        } else if (_tiendaId != null && !tiendas.any((t) => t.id == _tiendaId)) {
+        } else if (_tiendaId != null &&
+            !tiendas.any((t) => t.id == _tiendaId)) {
           _tiendaId = null;
         }
-      } else if (res.statusCode == 403) {
-        _sinPermiso = true;
       } else {
-        _errorContexto = 'No se pudo cargar el módulo de informes.';
+        _contexto = null;
+        _tiendaId = null;
+        if (res.statusCode == 403) {
+          _sinPermiso = true;
+        } else if (res.statusCode == 404) {
+          _errorContexto =
+              'Los informes aún no están disponibles en el servidor. '
+              'El equipo debe actualizarlo para habilitar esta función.';
+        } else if (res.statusCode == 401) {
+          _errorContexto =
+              'Tu sesión venció. Cierra sesión e ingresa nuevamente.';
+        } else if (res.statusCode == 429) {
+          _errorContexto = 'Se alcanzó el límite de consultas. Espera un momento y vuelve a intentar.';
+        } else {
+          _errorContexto = 'El servicio de informes no está disponible temporalmente. Intenta más tarde.';
+        }
       }
     } catch (_) {
-      _errorContexto = 'No pude conectarme con el servidor. Revisa tu conexión.';
+      _contexto = null;
+      _tiendaId = null;
+      _errorContexto =
+          'No pude conectarme con el servidor. Revisa tu conexión.';
     }
     _cargandoContexto = false;
     notifyListeners();
