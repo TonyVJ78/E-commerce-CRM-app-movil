@@ -67,6 +67,18 @@ class CartService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  /// CU-33: resultado del envío de la factura en la última compra hecha contra
+  /// el backend. `null` si la compra fue en modo autónomo (no hay factura).
+  bool? _ultimoReciboEnviado;
+  String _ultimoReciboEmail = '';
+  bool? get ultimoReciboEnviado => _ultimoReciboEnviado;
+  String get ultimoReciboEmail => _ultimoReciboEmail;
+
+  /// El checkout manda la factura por correo antes de responder (hasta
+  /// `EMAIL_TIMEOUT` = 15 s en el backend): con el timeout general de 20 s la
+  /// app podría dar por fallida una compra que sí se registró.
+  static const Duration _timeoutCheckout = Duration(seconds: 45);
+
   bool get _online => ApiService.instance.useOnlineBackend;
 
   /// Ítems agrupados por tienda, en el mismo orden en que se agregaron.
@@ -396,7 +408,7 @@ class CartService extends ChangeNotifier {
   // Checkout y pedidos
   // =========================================================================
 
-  /// Confirma el pedido.
+  /// Confirma el pedido pagado con QR o en efectivo.
   ///
   /// En modo servidor confirma la compra en la API; SQLite solo se usa en modo autónomo.
   Future<Pedido?> checkout({
@@ -404,7 +416,11 @@ class CartService extends ChangeNotifier {
     required String metodoPago,
   }) async {
     if (_items.isEmpty) return null;
-    if (_online) return _checkoutServidor(cliente: cliente, metodoPago: metodoPago);
+    if (_online) {
+      final metodo = metodoPago.toLowerCase().startsWith('qr') ? 'qr' : metodoPago;
+      return _checkoutServidor(cliente: cliente, metodoPago: metodo);
+    }
+    _ultimoReciboEnviado = null;
     // Descuenta el stock de las variantes registradas en CU-08.
     _isLoading = true;
     _clienteId = cliente.id;
@@ -490,6 +506,7 @@ class CartService extends ChangeNotifier {
     if (_items.isEmpty) return null;
     _isLoading = true;
     _errorMessage = null;
+    _ultimoReciboEnviado = null;
     notifyListeners();
 
     try {
@@ -497,7 +514,7 @@ class CartService extends ChangeNotifier {
         'metodo_pago': metodoPago,
         'payment_intent_id': ?paymentIntentId,
         'cupones': cuponesParaCheckout,
-      }, auth: true);
+      }, auth: true, timeout: _timeoutCheckout);
 
       if (res.statusCode != 201) {
         _errorMessage = _mensajeError(res.body);
@@ -511,6 +528,8 @@ class CartService extends ChangeNotifier {
           .map((e) => _entero(e))
           .toList();
       final primerTiendaId = _items.first.producto.tiendaId;
+      _ultimoReciboEnviado = data['recibo_enviado'] == true;
+      _ultimoReciboEmail = data['recibo_email']?.toString() ?? cliente.email;
 
       final pedido = Pedido(
         id: idsPedidos.isNotEmpty ? idsPedidos.first : 0,
@@ -518,11 +537,11 @@ class CartService extends ChangeNotifier {
         clienteEmail: cliente.email,
         tiendaId: primerTiendaId,
         tiendaNombre: nombreTienda(primerTiendaId),
-        estadoActual: 'completado',
+        estadoActual: 'pendiente',
         fecha: DateTime.now().toIso8601String(),
         subtotal: subtotalAmount,
         total: totalAmount,
-        metodoPago: metodoPago == 'stripe' ? 'Tarjeta (Stripe)' : metodoPago,
+        metodoPago: data['metodo_pago']?.toString() ?? (metodoPago == 'stripe' ? 'Tarjeta (Stripe)' : metodoPago),
       );
 
       _items = [];
@@ -589,7 +608,7 @@ class CartService extends ChangeNotifier {
     for (final tienda in tiendas) {
       final tiendaId = _entero((tienda as Map)['id']);
       final res = await ApiService.instance.get(ApiConstants.pedidosTienda(tiendaId), auth: true);
-      if (res.statusCode != 200) continue;
+      if (res.statusCode != 200) throw Exception(_mensajeError(res.body));
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final nombre = (data['tienda'] as Map?)?['nombre']?.toString() ?? '';
       for (final p in (data['pedidos'] as List? ?? const [])) {
@@ -605,6 +624,9 @@ class CartService extends ChangeNotifier {
       final data = jsonDecode(body);
       if (data is Map) {
         if (data['detail'] != null) return data['detail'].toString();
+        // Los endpoints de pedidos devuelven {"error": "..."} (a veces con
+        // banderas extra como "reembolsado" que no son mensajes).
+        if (data['error'] != null) return data['error'].toString();
         final partes = <String>[];
         data.forEach((campo, valor) {
           partes.add(valor is List ? valor.join(' ') : valor.toString());

@@ -11,12 +11,12 @@ import '../shared/home_shell.dart';
 import '../shared/kantu_app_bar.dart';
 import '../shared/kantu_search_field.dart';
 import '../shared/producto_imagen.dart';
+import 'chatbot_screen.dart';
 import '../../core/services/recommendation_service.dart';
 import 'producto_detail_sheet.dart';
 import '../../core/models/tienda.dart';
 import '../../core/theme/dynamic_theme_provider.dart';
 import '../tienda/tienda_header_widget.dart';
-import 'chatbot_screen.dart';
 import 'cupones_screen.dart';
 import 'notificaciones_screen.dart';
 import 'filtro_catalogo_sheet.dart';
@@ -140,6 +140,18 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
 
     return Scaffold(
       backgroundColor: KantuColors.background,
+      // Asistente de recomendaciones. La grilla deja espacio abajo para que el
+      // botón no tape la última fila de productos.
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'chatbot',
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+        ),
+        backgroundColor: KantuColors.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.auto_awesome),
+        label: const Text('Pregúntale a Kantu', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
       appBar: KantuAppBar(
         title: 'Kantu Market',
         showBackButton: false,
@@ -408,7 +420,7 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
@@ -430,23 +442,6 @@ class _HomeClienteScreenState extends State<HomeClienteScreen> {
                 ),
               ),
           ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const ChatbotScreen(),
-            ),
-          );
-        },
-        backgroundColor: KantuColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        icon: const Icon(Icons.auto_awesome, size: 20),
-        label: const Text(
-          'Pregúntale a Kantu',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
         ),
       ),
     );

@@ -154,6 +154,8 @@ class ApiService {
     );
   }
 
+  /// `timeout` permite esperar más que el valor general a las peticiones
+  /// lentas a propósito, como el chatbot, que consulta un modelo de IA.
   Future<http.Response> post(
     String endpoint,
     Map<String, dynamic> body, {

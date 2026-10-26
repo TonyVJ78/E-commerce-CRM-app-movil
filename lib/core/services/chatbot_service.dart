@@ -7,7 +7,7 @@ import '../constants/api_constants.dart';
 import '../models/producto.dart';
 import 'api_service.dart';
 
-/// Un mensaje de la conversaci├│n con el asistente.
+/// Un mensaje de la conversación con el asistente.
 class MensajeChat {
   final bool esUsuario;
 
@@ -33,11 +33,11 @@ class MensajeChat {
 
 /// Chatbot de recomendaciones (`POST /api/ia/chatbot/`).
 ///
-/// El backend no guarda la conversaci├│n, as├¡ que aqu├¡ se lleva el historial y
+/// El backend no guarda la conversación, así que aquí se lleva el historial y
 /// se manda completo en cada mensaje. Vive como provider para que la charla
-/// siga ah├¡ al cerrar la pantalla y volver; se reinicia al cambiar de cuenta.
+/// siga ahí al cerrar la pantalla y volver; se reinicia al cambiar de cuenta.
 class ChatbotService extends ChangeNotifier {
-  /// El modelo puede consultar el cat├ílogo varias veces antes de contestar.
+  /// El modelo puede consultar el catálogo varias veces antes de contestar.
   static const Duration _timeout = Duration(seconds: 60);
 
   static const MensajeChat _saludo = MensajeChat(
@@ -151,7 +151,7 @@ class ChatbotService extends ChangeNotifier {
   static MensajeChat _error(int status, String body) {
     String mensaje;
     if (status == 429) {
-      mensaje = 'Vas muy rápido. Espera un momento y vuelve a intentarlo.';
+      mensaje = 'Vas muy rápido 😅. Espera un momento y vuelve a intentarlo.';
     } else {
       mensaje = 'No pude responder ahora. Intenta de nuevo en unos segundos.';
       try {

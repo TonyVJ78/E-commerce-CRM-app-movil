@@ -65,6 +65,11 @@ class ApiConstants {
       '/pedidos/mis-pedidos/$pedidoId/';
   static String resenasPedido(int pedidoId) =>
       '/pedidos/mis-pedidos/$pedidoId/resenas/';
+  // CU-33: factura en PDF del pedido (descarga y reenvío al correo).
+  static String reciboPedido(int pedidoId) =>
+      '/pedidos/mis-pedidos/$pedidoId/recibo/';
+  static String reenviarReciboPedido(int pedidoId) =>
+      '/pedidos/mis-pedidos/$pedidoId/recibo/enviar/';
   static String pedidosTienda(int tiendaId) =>
       '/tiendas/$tiendaId/pedidos/';
 
@@ -76,6 +81,13 @@ class ApiConstants {
 
   // --- Chatbot Asistente IA (en cuarentena para endpoint backend futuro) ---
   static const String chatbot = '/ia/chatbot/';
+
+  // --- Informes de tienda con IA (CU-34) ---
+  static const String informes = '/ia/informes/';
+  static const String informesContexto = '/ia/informes/contexto/';
+  static const String informesGenerar = '/ia/informes/generar/';
+  static String informeDetalle(int id) => '/ia/informes/$id/';
+  static String informeExportar(int id) => '/ia/informes/$id/exportar/';
 
   // --- Notificaciones Push en Vivo (CU-18) ---
   static const String registrarDispositivo = '/usuarios/dispositivos/';
