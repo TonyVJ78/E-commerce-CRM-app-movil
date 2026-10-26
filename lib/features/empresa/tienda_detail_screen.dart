@@ -11,6 +11,7 @@ import '../shared/kantu_search_field.dart';
 import '../shared/producto_imagen.dart';
 import 'crm/tienda_crm_screen.dart';
 import 'campana_carrito_screen.dart';
+import '../cliente/cupones_screen.dart';
 import 'producto_form_screen.dart';
 
 /// Catálogo de una tienda desde el panel de la empresa.
@@ -134,6 +135,8 @@ class _TiendaDetailScreenState extends State<TiendaDetailScreen> {
       appBar: KantuAppBar(
         title: t.nombre,
         actions: [
+          IconButton(tooltip: 'Cupones y promociones', icon: const Icon(Icons.local_offer_outlined),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CuponesScreen(tienda: t)))),
           IconButton(
             tooltip: 'Carritos abandonados',
             icon: const Icon(Icons.shopping_cart_checkout_outlined),

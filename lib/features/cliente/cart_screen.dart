@@ -10,6 +10,7 @@ import '../shared/custom_button.dart';
 import '../shared/home_shell.dart';
 import '../shared/kantu_app_bar.dart';
 import '../shared/producto_imagen.dart';
+import 'cupon_carrito_field.dart';
 
 /// Carrito del cliente (CU-11).
 ///
@@ -467,6 +468,8 @@ class _CartScreenState extends State<CartScreen> {
         title: 'Carrito de Compras',
         showBackButton: false,
         actions: [
+          IconButton(tooltip: 'Actualizar carrito', icon: const Icon(Icons.refresh),
+            onPressed: cartService.isLoading ? null : () => cartService.loadCarrito(context.read<AuthService>().currentUser)),
           if (!cartService.isEmpty)
             IconButton(
               tooltip: 'Vaciar carrito',
@@ -484,6 +487,7 @@ class _CartScreenState extends State<CartScreen> {
                     padding: const EdgeInsets.all(16),
                     children: [
                       for (final entrada in grupos.entries) ...[
+                        CuponCarritoField(tiendaId: entrada.key),
                         _CabeceraTienda(
                           nombre: cartService.nombreTienda(entrada.key),
                           items: entrada.value.length,

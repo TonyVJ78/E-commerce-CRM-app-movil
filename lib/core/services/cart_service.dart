@@ -8,6 +8,7 @@ import '../models/pedido.dart';
 import '../models/producto.dart';
 import '../models/usuario.dart';
 import 'api_service.dart';
+import 'cupones_service.dart';
 
 /// Carrito de compras (CU-11).
 ///
@@ -20,6 +21,9 @@ import 'api_service.dart';
 /// El backend agrupa por tienda (un `Carrito` por cliente y tienda), y aquí se
 /// respeta esa forma con [porTienda].
 class CartService extends ChangeNotifier {
+  final CuponesService _cuponesService;
+  CartService({CuponesService? cuponesService}) : _cuponesService = cuponesService ?? CuponesService();
+  final Map<int, Map<String, dynamic>> _cupones = {};
   List<ItemCarrito> _items = [];
   final Map<int, String> _nombresTienda = {};
   List<Pedido> _pedidos = [];
@@ -30,7 +34,35 @@ class CartService extends ChangeNotifier {
   List<ItemCarrito> get itemsList => _items;
   bool get isEmpty => _items.isEmpty;
   int get itemCount => _items.fold(0, (suma, item) => suma + item.cantidad);
-  double get totalAmount => _items.fold(0.0, (suma, item) => suma + item.total);
+  double get subtotalAmount => _items.fold(0.0, (suma, item) => suma + item.total);
+  double get descuentoAmount => _cupones.keys.fold(0.0, (suma, id) => suma + descuentoTienda(id));
+  double get totalAmount => (subtotalAmount - descuentoAmount).clamp(0, double.infinity).toDouble();
+  String? codigoCupon(int id) => _cupones[id]?['codigo']?.toString();
+  double descuentoTienda(int id) => double.tryParse(_cupones[id]?['descuento']?.toString() ?? '') ?? 0;
+  Map<String, String> get cuponesParaCheckout => {for(final id in _cupones.keys) id.toString(): codigoCupon(id)!};
+
+  Future<bool> aplicarCupon(int tiendaId, String codigo) async {
+    _errorMessage = null;
+    if (!_online) { _errorMessage = 'Los cupones requieren conexión al servidor.'; notifyListeners(); return false; }
+    try {
+      final cotizacion = await _cuponesService.validar(tiendaId, codigo);
+      final subtotal = (porTienda[tiendaId] ?? []).fold(0.0, (suma, item) => suma + item.total);
+      final subtotalServidor = double.tryParse(cotizacion['subtotal']?.toString() ?? '');
+      final descuento = double.tryParse(cotizacion['descuento']?.toString() ?? '');
+      if (_entero(cotizacion['tienda_id']) != tiendaId || subtotalServidor == null ||
+          descuento == null || descuento < 0 || descuento > subtotalServidor ||
+          (subtotalServidor - subtotal).abs() > 0.011 || cotizacion['codigo'] == null) {
+        _errorMessage = 'El carrito cambió. Actualízalo antes de aplicar el cupón.';
+        notifyListeners(); return false;
+      }
+      _cupones[tiendaId] = cotizacion;
+      notifyListeners(); return true;
+    } catch(e) {
+      _errorMessage = e.toString(); notifyListeners(); return false;
+    }
+  }
+
+  void quitarCupon(int tiendaId) { _cupones.remove(tiendaId); notifyListeners(); }
   List<Pedido> get pedidos => _pedidos;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -63,6 +95,7 @@ class CartService extends ChangeNotifier {
 
   Future<void> loadCarrito(Usuario? cliente) async {
     if (cliente == null) return;
+    _cupones.clear();
     if (_clienteId != cliente.id) {
       _items = [];
       _nombresTienda.clear();
@@ -113,6 +146,7 @@ class CartService extends ChangeNotifier {
       }
 
       _items = items;
+      _cupones.clear();
       return true;
     } catch (_) {
       rethrow;
@@ -196,8 +230,8 @@ class CartService extends ChangeNotifier {
         existente: existente,
         nuevaCantidad: nuevaCantidad,
       );
-      if (ok) return true;
-      // Si el servidor falla se sigue por la vía local para no perder la acción.
+      if (!ok) { _errorMessage ??= 'No se pudo actualizar el carrito del servidor.'; notifyListeners(); }
+      return ok;
     }
 
     final clienteId = cliente?.id ?? _clienteId;
@@ -288,6 +322,7 @@ class CartService extends ChangeNotifier {
   // =========================================================================
 
   Future<void> cambiarCantidad(ItemCarrito item, int cantidad) async {
+    _cupones.clear();
     if (cantidad <= 0) {
       await eliminar(item);
       return;
@@ -300,8 +335,11 @@ class CartService extends ChangeNotifier {
     }
 
     if (_online && item.idRemoto != null) {
-      if (await _patchCantidadRemota(item.idRemoto!, cantidad)) return;
+      final ok = await _patchCantidadRemota(item.idRemoto!, cantidad);
+      if (!ok) { _errorMessage = 'No se pudo actualizar el carrito del servidor.'; notifyListeners(); }
+      return;
     }
+    if (_online) { _errorMessage = 'Actualiza el carrito antes de modificarlo.'; notifyListeners(); return; }
 
     await DatabaseHelper.instance.setCantidadItemCarrito(item.id, cantidad);
     item.cantidad = cantidad;
@@ -314,6 +352,7 @@ class CartService extends ChangeNotifier {
       cambiarCantidad(item, item.cantidad - 1);
 
   Future<void> eliminar(ItemCarrito item) async {
+    _cupones.clear();
     if (_online && item.idRemoto != null) {
       try {
         final res = await ApiService.instance.delete(
@@ -327,6 +366,7 @@ class CartService extends ChangeNotifier {
         }
       } catch (_) {}
     }
+    if (_online) { _errorMessage = 'No se pudo eliminar el producto del servidor.'; notifyListeners(); return; }
 
     await DatabaseHelper.instance.removeItemCarrito(item.id);
     _items.removeWhere((i) => i.id == item.id);
@@ -336,8 +376,10 @@ class CartService extends ChangeNotifier {
   Future<void> vaciar() async {
     if (_online) {
       try {
-        await ApiService.instance.delete(ApiConstants.carrito, auth: true);
-      } catch (_) {}
+        final res = await ApiService.instance.delete(ApiConstants.carrito, auth: true);
+        if (res.statusCode < 200 || res.statusCode >= 300) throw Exception('Solicitud rechazada');
+        _items = []; _cupones.clear(); _errorMessage = null; notifyListeners(); return;
+      } catch (_) { _errorMessage = 'No se pudo vaciar el carrito del servidor.'; notifyListeners(); return; }
     }
     if (_clienteId != null) {
       await DatabaseHelper.instance.clearCarrito(_clienteId!);
@@ -356,14 +398,13 @@ class CartService extends ChangeNotifier {
 
   /// Confirma el pedido.
   ///
-  /// El backend todavía no expone un endpoint para crear pedidos desde el
-  /// carrito, así que el pedido se registra en la base local en ambos modos; en
-  /// modo servidor además se vacía el carrito remoto.
+  /// En modo servidor confirma la compra en la API; SQLite solo se usa en modo autónomo.
   Future<Pedido?> checkout({
     required Usuario cliente,
     required String metodoPago,
   }) async {
     if (_items.isEmpty) return null;
+    if (_online) return _checkoutServidor(cliente: cliente, metodoPago: metodoPago);
     // Descuenta el stock de las variantes registradas en CU-08.
     _isLoading = true;
     _clienteId = cliente.id;
@@ -416,7 +457,7 @@ class CartService extends ChangeNotifier {
     try {
       final res = await ApiService.instance.post(
         ApiConstants.carritoPagoIntento,
-        {},
+        {'cupones': cuponesParaCheckout},
         auth: true,
       );
       if (res.statusCode != 200) {
@@ -443,7 +484,9 @@ class CartService extends ChangeNotifier {
   Future<Pedido?> checkoutStripeRemoto({
     required Usuario cliente,
     required String paymentIntentId,
-  }) async {
+  }) => _checkoutServidor(cliente: cliente, metodoPago: 'stripe', paymentIntentId: paymentIntentId);
+
+  Future<Pedido?> _checkoutServidor({required Usuario cliente, required String metodoPago, String? paymentIntentId}) async {
     if (_items.isEmpty) return null;
     _isLoading = true;
     _errorMessage = null;
@@ -451,8 +494,9 @@ class CartService extends ChangeNotifier {
 
     try {
       final res = await ApiService.instance.post(ApiConstants.carritoCheckout, {
-        'metodo_pago': 'stripe',
-        'payment_intent_id': paymentIntentId,
+        'metodo_pago': metodoPago,
+        'payment_intent_id': ?paymentIntentId,
+        'cupones': cuponesParaCheckout,
       }, auth: true);
 
       if (res.statusCode != 201) {
@@ -476,12 +520,13 @@ class CartService extends ChangeNotifier {
         tiendaNombre: nombreTienda(primerTiendaId),
         estadoActual: 'completado',
         fecha: DateTime.now().toIso8601String(),
-        subtotal: totalAmount,
+        subtotal: subtotalAmount,
         total: totalAmount,
-        metodoPago: 'Tarjeta (Stripe)',
+        metodoPago: metodoPago == 'stripe' ? 'Tarjeta (Stripe)' : metodoPago,
       );
 
       _items = [];
+      _cupones.clear();
       _pedidos.insert(0, pedido);
       _isLoading = false;
       notifyListeners();

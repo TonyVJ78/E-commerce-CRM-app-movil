@@ -98,4 +98,8 @@ class ApiConstants {
   static String campanaCarrito(int tiendaId) => '/tiendas/$tiendaId/campana-carrito/';
   static String carritosAbandonados(int tiendaId) => '/tiendas/$tiendaId/carritos-abandonados/';
   static String pruebaCampanaCarrito(int tiendaId) => '/tiendas/$tiendaId/campana-carrito/disparar-prueba/';
+  static String cuponesTienda(int id) => '/tiendas/$id/cupones/';
+  static String cuponTienda(int tienda, int id) => '/tiendas/$tienda/cupones/$id/';
+  static const cuponesCliente = '/marketing/cupones/';
+  static const validarCupon = '/marketing/cupones/validar/';
 }
