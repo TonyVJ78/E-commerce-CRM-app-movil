@@ -4,6 +4,11 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Native Firebase resources are needed when Android starts FCM before Dart.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "bo.kantu.kantu_market"
     compileSdk = flutter.compileSdkVersion

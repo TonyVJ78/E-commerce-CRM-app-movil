@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Kantu Android + API local + Firebase",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define-from-file=config/firebase.local.json",
+        "--dart-define=API_BASE_URL=http://10.0.2.2:8000/api"
+      ]
+    }
+  ]
+}

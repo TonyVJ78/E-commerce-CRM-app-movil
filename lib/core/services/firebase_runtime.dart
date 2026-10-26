@@ -12,8 +12,11 @@ class FirebaseRuntime {
       [apiKey, appId, projectId, senderId].every((v) => v.isNotEmpty);
 
   static Future<bool> initialize() async {
-    if (!configured) return false;
     try {
+      if (!configured) {
+        await Firebase.initializeApp();
+        return true;
+      }
       await Firebase.initializeApp(
         options: const FirebaseOptions(
           apiKey: apiKey,
